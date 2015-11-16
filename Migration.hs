@@ -19,26 +19,29 @@ data CompTree a = MigrateEffect (CompTree a) | Result a deriving (Show,Read)
 type MigrationComp a =
     ([handles|h {Migrate}|], Num a) => Comp h a
 
-[handler|
+[shallowHandler|
     ReifyComp a :: CompTree a
         handles {Migrate} where
             Return x -> Result x
-            Migrate k -> reifyComp (MigrateEffect (k ()))
+            Migrate k -> MigrateEffect (reifyComp (k ()))
 |]
+
+test a k = k ()
 
 [shallowHandler|
-    RunMigration a :: a
-        handles {Migrate} where
-            Return x -> x
-            Migrate k -> reifyComp (k ())
-|]
+    forward h.
+        RunMigration a :: a
+            handles {Migrate} where
+                Return x -> return x
+                Migrate k -> test (reifyComp (k ())) k
+ |]
 
-testComp :: MigrationComp String
+testComp :: MigrationComp Int
 testComp = do {
     migrate;
-    return "howdy"
+    return 2
 }
 
+main :: IO (CompTree Int)
 main = do 
-    runMigration testComp
-    return ()
+    return (reifyComp testComp)
