@@ -26,15 +26,16 @@ type MigrationComp a =
             Migrate k -> MigrateEffect (reifyComp (k ()))
 |]
 
-test a k = k ()
-
 [shallowHandler|
     forward h.
-        RunMigration a :: a
+        RunMigration a :: a -> a
             handles {Migrate} where
-                Return x -> return x
-                Migrate k -> test (reifyComp (k ())) k
- |]
+                Return d x -> return x
+                Migrate d k -> {
+                    tree <- reifyComp d (k ());
+                    return d
+                }
+|]
 
 testComp :: MigrationComp Int
 testComp = do {
