@@ -37,12 +37,16 @@ type MigrationComp a =
                 }
 |]
 
+runCompTree :: CompTree a -> MigrationComp a
+runCompTree (Result x) = return x
+runCompTree (MigrateEffect comp) = do {migrate; runCompTree comp}
+
 testComp :: MigrationComp Int
 testComp = do {
     migrate;
     return 2
 }
 
-main :: IO (CompTree Int)
-main = do 
-    return (reifyComp testComp)
+--main :: IO (CompTree Int)
+--main = do 
+--    return (reifyComp testComp)
