@@ -11,6 +11,10 @@
 
 import ShallowFreeHandlers
 import DesugarHandlers
+import Network.Simple.TCP (connect, listen, accept, HostPreference(Host))
+import Network.Socket (recv, send)
+
+portNum = 8000
 
 data CompTree a = MigrateEffect (CompTree a) | Result a deriving (Show,Read)
 
@@ -33,6 +37,7 @@ type MigrationComp a =
                 Return d x -> return x
                 Migrate d k -> {
                     tree <- reifyComp d (k ());
+                    sendComp tree
                     return d
                 }
 |]
@@ -40,6 +45,19 @@ type MigrationComp a =
 runCompTree :: CompTree a -> MigrationComp a
 runCompTree (Result x) = return x
 runCompTree (MigrateEffect comp) = do {migrate; runCompTree comp}
+
+listenForComp :: IO ()
+listenForComp = listen (Host "127.0.0.01") portNum $ \(socket, socketAddress) -> do
+    putStrLn "Listening for incoming connections..."
+    accept socket $ \(socket, remoteAddress) -> do
+        str <- recv socket 4096
+        putStrLn "Recieved computation, running it"
+
+sendComp :: CompTree a -> IO ()
+sendComp comp = do 
+    connect "127.0.0.1" "8000" $ \(socket, remoteAddress) -> do
+        putStrLn "Sending computation"
+        send socket (show comp)
 
 testComp :: MigrationComp Int
 testComp = do {
