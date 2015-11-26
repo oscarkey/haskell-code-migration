@@ -14,7 +14,7 @@ import DesugarHandlers
 import Network.Simple.TCP (connect, listen, accept, HostPreference(Host))
 import Network.Socket (recv, send)
 
-portNum = 8000
+portNum = "8000"
 
 data CompTree a = MigrateEffect (CompTree a) | Result a deriving (Show,Read)
 
@@ -55,7 +55,7 @@ listenForComp = listen (Host "127.0.0.01") portNum $ \(socket, socketAddress) ->
 
 sendComp :: CompTree a -> IO ()
 sendComp comp = do 
-    connect "127.0.0.1" "8000" $ \(socket, remoteAddress) -> do
+    connect "127.0.0.1" portNum $ \(socket, remoteAddress) -> do
         putStrLn "Sending computation"
         send socket (show comp)
 
