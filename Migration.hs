@@ -44,8 +44,6 @@ runCompTree :: CompTree a -> MigrationComp a
 runCompTree (Result x) = return x
 runCompTree (MigrateEffect comp) = do {migrate; runCompTree comp}
 
-listenForComp :: IO ()
-listenForComp = listen (Host "127.0.0.01") portNum $ \(socket, socketAddress) -> do
 listenForComp :: IO a
 listenForComp = listen (Host "127.0.0.1") portNum $ \(socket, socketAddress) -> do
     putStrLn "Listening for incoming connections..."
