@@ -48,12 +48,14 @@ runCompTree (MigrateEffect comp) = do {migrate; runCompTree comp}
 
 listenForComp :: IO ()
 listenForComp = listen (Host "127.0.0.01") portNum $ \(socket, socketAddress) -> do
+listenForComp :: IO a
+listenForComp = listen (Host "127.0.0.1") portNum $ \(socket, socketAddress) -> do
     putStrLn "Listening for incoming connections..."
     accept socket $ \(socket, remoteAddress) -> do
         str <- recv socket 4096
         putStrLn "Recieved computation, running it"
 
-sendComp :: CompTree a -> IO ()
+sendComp :: CompTree a -> IO Int
 sendComp comp = do 
     connect "127.0.0.1" portNum $ \(socket, remoteAddress) -> do
         putStrLn "Sending computation"
