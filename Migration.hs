@@ -50,6 +50,8 @@ listenForComp = listen (Host "127.0.0.1") portNum $ \(socket, socketAddress) -> 
     accept socket $ \(socket, remoteAddress) -> do
         str <- recv socket 4096
         putStrLn "Recieved computation, running it"
+        let comp = (read str :: CompTree a)
+        runMigration $ runCompTree comp;
 
 sendComp :: CompTree a -> IO Int
 sendComp comp = do 
