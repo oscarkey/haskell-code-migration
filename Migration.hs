@@ -31,15 +31,13 @@ type MigrationComp a =
 |]
 
 [shallowHandler|
-    forward h.
-        RunMigration a :: a -> a
-            handles {Migrate} where
-                Return d x -> return x
-                Migrate d k -> {
-                    tree <- reifyComp d (k ());
-                    sendComp tree
-                    return d
-                }
+    RunMigration a :: IO a
+        handles {Migrate} where
+            Return x -> return x
+            Migrate k -> do {
+                sendComp $ reifyComp (k ());
+                listenForComp
+            }
 |]
 
 runCompTree :: CompTree a -> MigrationComp a
