@@ -59,6 +59,5 @@ sendComp comp = do
 testComp :: MigrationComp
 testComp = do {
     migrate;
---main :: IO (CompTree Int)
---main = do 
---    return (reifyComp testComp)
+    return 4
+}
