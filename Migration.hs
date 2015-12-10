@@ -61,3 +61,5 @@ testComp = do {
     migrate;
     return 4
 }
+main :: IO ()
+main = return ()
