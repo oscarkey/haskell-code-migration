@@ -13,28 +13,52 @@ import Handlers
 import DesugarHandlers
 import Network.Simple.TCP (connect, listen, accept, HostPreference(Host))
 import Network.Socket (recv, send)
+import qualified Data.Map.Strict as Map
 
 portNum = "8000"
+
+
+-- Store.
+type StoreIndex = Int
+type Store = Map.Map StoreIndex Int
+
+save :: Store -> StoreIndex -> Int -> Store
+save store i x = Map.insert i x store
+
+retrieve :: Store -> StoreIndex -> Int
+retrieve store i = let x = Map.lookup i store in
+    case x of Just v -> v
+              Nothing -> 0
+
+emptyStore :: Store
+emptyStore = Map.empty
 
 
 -- Tree to represent computations.
 data CompTree = Result Int
     | MigrateEffect CompTree 
-    | PrintStrEffect String CompTree deriving (Show,Read)
+    | PrintStrEffect String CompTree
+    | PrintStoreEffect StoreIndex CompTree
+    | ReadIntEffect StoreIndex CompTree deriving (Show,Read)
 
 
 -- Handlers and reification.
 [operation|Migrate :: ()|]
 [operation|PrintStr :: String -> ()|]
+[operation|PrintStore :: StoreIndex -> ()|]
+[operation|ReadInt :: StoreIndex|]
 
-type MigrationComp = ([handles|h {Migrate, PrintStr}|]) => Comp h Int
+type MigrationComp = ([handles|h {Migrate, PrintStr, PrintStore, ReadInt}|]) 
+                        => Comp h Int
 
 [handler|
-    ReifyComp :: CompTree
-        handles {Migrate, PrintStr} where
-            Return       x -> Result x
-            Migrate      k -> MigrateEffect (k ())
-            PrintStr str k -> PrintStrEffect str (k ())
+    ReifyComp :: StoreIndex -> CompTree
+        handles {Migrate, PrintStr, PrintStore, ReadInt} where
+            Return         x i -> Result x
+            Migrate        k i -> MigrateEffect (k () i)
+            PrintStr   str k i -> PrintStrEffect str (k () i)
+            PrintStore str k i -> PrintStoreEffect str (k () i)
+            ReadInt        k i -> ReadIntEffect i (k i (i+1))
 |]
 
 
@@ -45,36 +69,35 @@ listenForComp = listen (Host "127.0.0.1") portNum $ \(socket, socketAddress) -> 
     accept socket $ \(socket, remoteAddress) -> do
         str <- recv socket 4096
         putStrLn "Received computation, running it"
-        let comp = (read str :: CompTree)
-        runCompTree comp
+        let (comp, store) = (read str :: (CompTree, Store))
+        runCompTree (comp, store)
 
 sendComp :: (CompTree, Store) -> IO Int
 sendComp (comp, store) = do 
     connect "127.0.0.1" portNum $ \(socket, remoteAddress) -> do
         putStrLn "Sending computation"
-        send socket $ show comp
+        send socket $ show (comp, store)
 
 
-runCompTree :: CompTree -> IO Int
-runCompTree (Result x) = return x
-runCompTree (MigrateEffect comp) = do
-    sendComp (comp, [])
+runCompTree :: (CompTree, Store) -> IO Int
+runCompTree (Result x, store) = return x
+runCompTree (MigrateEffect comp, store) = do
+    sendComp (comp, store)
     listenForComp
-runCompTree (PrintStrEffect str comp) = do
+runCompTree (PrintStrEffect str comp, store) = do
     putStrLn str
-    runCompTree comp
+    runCompTree (comp, store)
+runCompTree (PrintStoreEffect i comp, store) = do
+    putStrLn $ show (retrieve store i)
+    runCompTree (comp, store)
+runCompTree (ReadIntEffect i comp, store) = do
+    line <- getLine
+    let store' = save store i (read line)
+    runCompTree (comp, store')
 
 runMigrationComp :: MigrationComp -> IO Int
-runMigrationComp comp = runCompTree (reifyComp comp)
+runMigrationComp comp = runCompTree (reifyComp 0 comp, emptyStore)
 
-
-testComp :: MigrationComp
-testComp = do {
-    printStr "How many pupils are present?";
-    migrate;
-    printStr "Print something else";
-    return 3
-}
 
 main :: IO ()
 main = return ()
