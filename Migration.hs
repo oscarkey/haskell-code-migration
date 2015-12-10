@@ -16,50 +16,65 @@ import Network.Socket (recv, send)
 
 portNum = "8000"
 
-data CompTree = MigrateEffect CompTree | Result Int deriving (Show,Read)
 
+-- Tree to represent computations.
+data CompTree = Result Int
+    | MigrateEffect CompTree 
+    | PrintStrEffect String CompTree deriving (Show,Read)
+
+
+-- Handlers and reification.
 [operation|Migrate :: ()|]
+[operation|PrintStr :: String -> ()|]
 
-type MigrationComp = ([handles|h {Migrate}|]) => Comp h Int
+type MigrationComp = ([handles|h {Migrate, PrintStr}|]) => Comp h Int
 
 [handler|
-    RunMigration :: Bool -> IO CompTree
-        handles {Migrate} where
-            Return  x reify -> return (Result x)
-            Migrate k reify -> if reify then do {
-                child <- k () True;
-                return (MigrateEffect child)
-            }
-            else do {
-                comp <- k () True;
-                sendComp comp;
-                listenForComp
-            }
+    ReifyComp :: CompTree
+        handles {Migrate, PrintStr} where
+            Return       x -> Result x
+            Migrate      k -> MigrateEffect (k ())
+            PrintStr str k -> PrintStrEffect str (k ())
 |]
 
-runCompTree :: CompTree -> MigrationComp
-runCompTree (Result x) = return x
-runCompTree (MigrateEffect comp) = do {migrate; runCompTree comp}
 
-listenForComp :: IO CompTree
+-- Networking.
+listenForComp :: IO Int
 listenForComp = listen (Host "127.0.0.1") portNum $ \(socket, socketAddress) -> do
     putStrLn "Listening for incoming connections..."
     accept socket $ \(socket, remoteAddress) -> do
         str <- recv socket 4096
         putStrLn "Received computation, running it"
         let comp = (read str :: CompTree)
-        runMigration False $ runCompTree comp;
+        runCompTree comp
 
-sendComp :: CompTree -> IO Int
-sendComp comp = do 
+sendComp :: (CompTree, Store) -> IO Int
+sendComp (comp, store) = do 
     connect "127.0.0.1" portNum $ \(socket, remoteAddress) -> do
         putStrLn "Sending computation"
-        send socket (show comp)
+        send socket $ show comp
+
+
+runCompTree :: CompTree -> IO Int
+runCompTree (Result x) = return x
+runCompTree (MigrateEffect comp) = do
+    sendComp (comp, [])
+    listenForComp
+runCompTree (PrintStrEffect str comp) = do
+    putStrLn str
+    runCompTree comp
+
+runMigrationComp :: MigrationComp -> IO Int
+runMigrationComp comp = runCompTree (reifyComp comp)
+
 
 testComp :: MigrationComp
 testComp = do {
+    printStr "How many pupils are present?";
     migrate;
-    return 4
+    printStr "Print something else";
+    return 3
 }
+
 main :: IO ()
 main = return ()
