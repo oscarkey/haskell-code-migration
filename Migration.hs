@@ -9,6 +9,8 @@
     UndecidableInstances,
     ConstraintKinds #-}
 
+module Migration where
+
 import Handlers
 import DesugarHandlers
 import Network.Simple.TCP (connect, listen, accept, HostPreference(Host))
@@ -97,7 +99,3 @@ runCompTree (ReadIntEffect i comp, store) = do
 
 runMigrationComp :: MigrationComp -> IO Int
 runMigrationComp comp = runCompTree (reifyComp 0 comp, emptyStore)
-
-
-main :: IO ()
-main = return ()
