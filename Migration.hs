@@ -13,7 +13,7 @@ module Migration where
 
 import Handlers
 import DesugarHandlers
-import Network.Simple.TCP (connect, listen, accept, HostPreference(Host))
+import Network.Simple.TCP (connect, listen, accept, HostPreference(Host), HostName)
 import Network.Socket (recv, send)
 import qualified Data.Map.Strict as Map
 
@@ -38,14 +38,14 @@ emptyStore = Map.empty
 
 -- Tree to represent computations.
 data CompTree = Result Int
-    | MigrateEffect CompTree 
+    | MigrateEffect HostName CompTree 
     | PrintStrEffect String CompTree
     | PrintStoreEffect StoreIndex CompTree
     | ReadIntEffect StoreIndex CompTree deriving (Show,Read)
 
 
 -- Handlers and reification.
-[operation|Migrate :: ()|]
+[operation|Migrate :: HostName -> ()|]
 [operation|PrintStr :: String -> ()|]
 [operation|PrintStore :: StoreIndex -> ()|]
 [operation|ReadInt :: StoreIndex|]
@@ -56,11 +56,11 @@ type MigrationComp = ([handles|h {Migrate, PrintStr, PrintStore, ReadInt}|])
 [handler|
     ReifyComp :: StoreIndex -> CompTree
         handles {Migrate, PrintStr, PrintStore, ReadInt} where
-            Return         x i -> Result x
-            Migrate        k i -> MigrateEffect (k () i)
-            PrintStr   str k i -> PrintStrEffect str (k () i)
-            PrintStore str k i -> PrintStoreEffect str (k () i)
-            ReadInt        k i -> ReadIntEffect i (k i (i+1))
+            Return          x i -> Result x
+            Migrate    host k i -> MigrateEffect host (k () i)
+            PrintStr    str k i -> PrintStrEffect str (k () i)
+            PrintStore  str k i -> PrintStoreEffect str (k () i)
+            ReadInt         k i -> ReadIntEffect i (k i (i+1))
 |]
 
 
@@ -74,17 +74,17 @@ listenForComp = listen (Host "127.0.0.1") portNum $ \(socket, socketAddress) -> 
         let (comp, store) = (read str :: (CompTree, Store))
         runCompTree (comp, store)
 
-sendComp :: (CompTree, Store) -> IO Int
-sendComp (comp, store) = do 
-    connect "127.0.0.1" portNum $ \(socket, remoteAddress) -> do
-        putStrLn "Sending computation"
+sendComp :: HostName -> (CompTree, Store) -> IO Int
+sendComp hostName (comp, store) = do 
+    connect hostName portNum $ \(socket, remoteAddress) -> do
+        putStrLn $ "Sending computation to " ++ hostName
         send socket $ show (comp, store)
 
 
 runCompTree :: (CompTree, Store) -> IO Int
 runCompTree (Result x, store) = return x
-runCompTree (MigrateEffect comp, store) = do
-    sendComp (comp, store)
+runCompTree (MigrateEffect host comp, store) = do
+    sendComp host (comp, store)
     listenForComp
 runCompTree (PrintStrEffect str comp, store) = do
     putStrLn str
