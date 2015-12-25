@@ -22,16 +22,16 @@ portNum = "8000"
 
 -- Store.
 data StoreKey a = StoreKey Int deriving (Show, Read)
-data StoreValue = StoreNumValue Int deriving (Show, Read)
+data StoreValue = StoreIntValue Int deriving (Show, Read)
 type Store = Map.Map Int StoreValue
 
-saveNum :: Store -> StoreKey Int -> Int -> Store
-saveNum store (StoreKey k) x = Map.insert k (StoreNumValue x) store
+saveInt :: Store -> StoreKey Int -> Int -> Store
+saveInt store (StoreKey k) x = Map.insert k (StoreIntValue x) store
 
-retrieveNum :: Store -> StoreKey Int -> Int
-retrieveNum store (StoreKey k) = 
+retrieveInt :: Store -> StoreKey Int -> Int
+retrieveInt store (StoreKey k) = 
     let v = Map.lookup k store in
-        case v of Just u  -> case u of StoreNumValue x -> x
+        case v of Just u  -> case u of StoreIntValue x -> x
                   Nothing -> error "No value associated with store location"
 
 
@@ -40,39 +40,39 @@ emptyStore = Map.empty
 
 
 -- Abstract values.
-data AbsNum = NumVal Int
-            | NumVar (StoreKey Int)
-            | OpPlus AbsNum AbsNum
-            | OpMinus AbsNum AbsNum
-            | OpMult AbsNum AbsNum
-            | OpSig AbsNum
+data AbsInt = IntVal Int
+            | IntVar (StoreKey Int)
+            | OpPlus AbsInt AbsInt
+            | OpMinus AbsInt AbsInt
+            | OpMult AbsInt AbsInt
+            | OpSig AbsInt
     deriving (Show, Read)
 
-instance Num AbsNum where
-    (NumVal x) + (NumVal y) = NumVal (x + y)
+instance Num AbsInt where
+    (IntVal x) + (IntVal y) = IntVal (x + y)
     x + y = OpPlus x y
-    (NumVal x) - (NumVal y) = NumVal (x - y)
+    (IntVal x) - (IntVal y) = IntVal (x - y)
     x - y = OpMinus x y
-    (NumVal x) * (NumVal y) = NumVal (x * y)
+    (IntVal x) * (IntVal y) = IntVal (x * y)
     x * y = OpMult x y
-    negate x = (NumVal 0) - x
+    negate x = (IntVal 0) - x
     signum x = OpSig x
     abs x = x * (signum x)
-    fromInteger x = NumVal (fromInteger x)
+    fromInteger x = IntVal (fromInteger x)
 
-evalAbsNum store (NumVal    x) = x
-evalAbsNum store (NumVar    k) = retrieveNum store k
-evalAbsNum store (OpPlus  x y) = (evalAbsNum store x) + (evalAbsNum store y)
-evalAbsNum store (OpMinus x y) = (evalAbsNum store x) - (evalAbsNum store y)
-evalAbsNum store (OpMult  x y) = (evalAbsNum store x) * (evalAbsNum store y)
-evalAbsNum store (OpSig     x) = signum $ evalAbsNum store x
+evalAbsInt store (IntVal    x) = x
+evalAbsInt store (IntVar    k) = retrieveInt store k
+evalAbsInt store (OpPlus  x y) = (evalAbsInt store x) + (evalAbsInt store y)
+evalAbsInt store (OpMinus x y) = (evalAbsInt store x) - (evalAbsInt store y)
+evalAbsInt store (OpMult  x y) = (evalAbsInt store x) * (evalAbsInt store y)
+evalAbsInt store (OpSig     x) = signum $ evalAbsInt store x
 
 
 class AbsShow a where
     ashow :: Store -> a -> String
 
-instance AbsShow AbsNum where
-    ashow store x = show $ evalAbsNum store x
+instance AbsShow AbsInt where
+    ashow store x = show $ evalAbsInt store x
 
 instance AbsShow Int where
     ashow store x = show x
@@ -82,29 +82,29 @@ instance AbsShow Int where
 data CompTree = Result Int
     | MigrateEffect HostName CompTree 
     | PrintStrEffect String CompTree
-    | PrintNumEffect AbsNum CompTree
-    | ReadNumEffect (StoreKey Int) CompTree deriving (Show,Read)
+    | PrintIntEffect AbsInt CompTree
+    | ReadIntEffect (StoreKey Int) CompTree deriving (Show,Read)
 
 
 -- Handlers and reification.
 [operation|Migrate  :: HostName -> ()|]
 [operation|PrintStr :: String -> ()|]
-[operation|PrintNum :: AbsNum -> ()|]
-[operation|ReadNum  :: AbsNum|]
+[operation|PrintInt :: AbsInt -> ()|]
+[operation|ReadInt  :: AbsInt|]
 
-type MigrationComp = ([handles|h {Migrate, PrintStr, PrintNum, ReadNum}|]) 
+type MigrationComp = ([handles|h {Migrate, PrintStr, PrintInt, ReadInt}|]) 
                         => Comp h Int
 
 [handler|
     ReifyComp :: Int -> CompTree
-        handles {Migrate, PrintStr, PrintNum, ReadNum} where
+        handles {Migrate, PrintStr, PrintInt, ReadInt} where
             Return          x i -> Result x
             Migrate    host k i -> MigrateEffect host (k () i)
             PrintStr    str k i -> PrintStrEffect str (k () i)
-            PrintNum      x k i -> PrintNumEffect x (k () i)
-            ReadNum         k i -> 
+            PrintInt      x k i -> PrintIntEffect x (k () i)
+            ReadInt         k i -> 
                 let key = StoreKey i in
-                ReadNumEffect key (k (NumVar key) (i+1))
+                ReadIntEffect key (k (IntVar key) (i+1))
 |]
 
 
@@ -133,12 +133,12 @@ runCompTree (MigrateEffect host comp, store) = do
 runCompTree (PrintStrEffect str comp, store) = do
     putStrLn str
     runCompTree (comp, store)
-runCompTree (PrintNumEffect x comp, store) = do
+runCompTree (PrintIntEffect x comp, store) = do
     putStrLn $ ashow store x
     runCompTree (comp, store)
-runCompTree (ReadNumEffect k comp, store) = do
+runCompTree (ReadIntEffect k comp, store) = do
     line <- getLine
-    let store' = saveNum store k (read line)
+    let store' = saveInt store k (read line)
     runCompTree (comp, store')
 
 runMigrationComp :: MigrationComp -> IO Int
