@@ -34,7 +34,6 @@ retrieveInt store (StoreKey k) =
         case v of Just u  -> case u of StoreIntValue x -> x
                   Nothing -> error "No value associated with store location"
 
-
 emptyStore :: Store
 emptyStore = Map.empty
 
@@ -78,12 +77,13 @@ instance AbsShow Int where
     ashow store x = show x
 
 
--- Tree to represent computations.
+-- Computation tree.
 data CompTree = Result Int
     | MigrateEffect HostName CompTree 
     | PrintStrEffect String CompTree
     | PrintIntEffect AbsInt CompTree
-    | ReadIntEffect (StoreKey Int) CompTree deriving (Show,Read)
+    | ReadIntEffect (StoreKey Int) CompTree
+    deriving (Show,Read)
 
 
 -- Handlers and reification.
@@ -125,6 +125,7 @@ sendComp hostName (comp, store) = do
         send socket $ show (comp, store)
 
 
+-- Interpreter.
 runCompTree :: (CompTree, Store) -> IO Int
 runCompTree (Result x, store) = return x
 runCompTree (MigrateEffect host comp, store) = do
