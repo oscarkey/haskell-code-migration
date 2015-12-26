@@ -14,11 +14,11 @@ import Migration
 registerComp :: MigrationComp
 registerComp = do 
     printStr "How many pupils are currently present?"
-    count <- readNum
+    count <- readInt
     migrate "127.0.0.1"
     printStr "The number of pupils present was:"
-    printNum count
     return 0
+    printInt count
 
 main :: IO Int
 main = runMigrationComp registerComp
