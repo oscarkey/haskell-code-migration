@@ -1,12 +1,5 @@
-{-# LANGUAGE TypeFamilies,
-    GADTs,
-    RankNTypes,
-    MultiParamTypeClasses,
-    QuasiQuotes,
-    FlexibleInstances,
+{-# LANGUAGE
     FlexibleContexts,
-    OverlappingInstances,
-    UndecidableInstances,
     ConstraintKinds #-}
 
 import Migration
