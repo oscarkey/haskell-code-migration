@@ -59,6 +59,7 @@ instance Num AbsInt where
     abs x = x * (signum x)
     fromInteger x = IntVal (fromInteger x)
 
+evalAbsInt :: Store -> AbsInt -> Int
 evalAbsInt store (IntVal    x) = x
 evalAbsInt store (IntVar    k) = retrieveInt store k
 evalAbsInt store (OpPlus  x y) = (evalAbsInt store x) + (evalAbsInt store y)
