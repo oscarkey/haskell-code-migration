@@ -78,12 +78,12 @@ instance AbsShow Int where
 
 
 -- Computation tree.
-data CompTree = Result Int
-    | MigrateEffect HostName CompTree 
-    | PrintStrEffect String CompTree
-    | PrintIntEffect AbsInt CompTree
-    | ReadIntEffect (StoreKey Int) CompTree
-    deriving (Show,Read)
+data CompTree a = Result a
+    | MigrateEffect HostName (CompTree a) 
+    | PrintStrEffect String (CompTree a)
+    | PrintIntEffect AbsInt (CompTree a)
+    | ReadIntEffect (StoreKey Int) (CompTree a)
+    deriving (Show, Read)
 
 
 -- Handlers and reification.
@@ -92,11 +92,11 @@ data CompTree = Result Int
 [operation|PrintInt :: AbsInt -> ()|]
 [operation|ReadInt  :: AbsInt|]
 
-type MigrationComp = ([handles|h {Migrate, PrintStr, PrintInt, ReadInt}|]) 
-                        => Comp h Int
+type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintInt, ReadInt}|])
+                        => Comp h a
 
 [handler|
-    ReifyComp :: Int -> CompTree
+    ReifyComp a :: Int -> CompTree a
         handles {Migrate, PrintStr, PrintInt, ReadInt} where
             Return          x i -> Result x
             Migrate    host k i -> MigrateEffect host (k () i)
@@ -109,16 +109,16 @@ type MigrationComp = ([handles|h {Migrate, PrintStr, PrintInt, ReadInt}|])
 
 
 -- Networking.
-listenForComp :: IO Int
+listenForComp :: (Show a, Read a) => IO a
 listenForComp = listen (Host "127.0.0.1") portNum $ \(socket, socketAddress) -> do
     putStrLn "Listening for incoming connections..."
     accept socket $ \(socket, remoteAddress) -> do
         str <- recv socket 4096
         putStrLn "Received computation, running it"
-        let (comp, store) = (read str :: (CompTree, Store))
+        let (comp, store) = (read str :: (Show a, Read a) => (CompTree a, Store))
         runCompTree (comp, store)
 
-sendComp :: HostName -> (CompTree, Store) -> IO Int
+sendComp :: (Show a, Read a) => HostName -> (CompTree a, Store) -> IO Int
 sendComp hostName (comp, store) = do 
     connect hostName portNum $ \(socket, remoteAddress) -> do
         putStrLn $ "Sending computation to " ++ hostName
@@ -126,7 +126,7 @@ sendComp hostName (comp, store) = do
 
 
 -- Interpreter.
-runCompTree :: (CompTree, Store) -> IO Int
+runCompTree :: (Show a, Read a) => (CompTree a, Store) -> IO a
 runCompTree (Result x, store) = return x
 runCompTree (MigrateEffect host comp, store) = do
     sendComp host (comp, store)
@@ -142,5 +142,5 @@ runCompTree (ReadIntEffect k comp, store) = do
     let store' = saveInt store k (read line)
     runCompTree (comp, store')
 
-runMigrationComp :: MigrationComp -> IO Int
+runMigrationComp :: (Show a, Read a) => MigrationComp a -> IO a
 runMigrationComp comp = runCompTree (reifyComp 0 comp, emptyStore)
