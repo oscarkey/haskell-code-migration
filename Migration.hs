@@ -22,23 +22,35 @@ portNum = "8000"
 
 -- Store.
 data StoreKey a = StoreKey Int deriving (Show, Read)
-data StoreValue = StoreIntValue Int deriving (Show, Read)
+data StoreValue = StoreIntValue Int 
+    deriving (Show, Read)
 type Store = Map.Map Int StoreValue
-
-saveInt :: Store -> StoreKey Int -> Int -> Store
-saveInt store (StoreKey k) x = Map.insert k (StoreIntValue x) store
-
-retrieveInt :: Store -> StoreKey Int -> Int
-retrieveInt store (StoreKey k) = 
-    let v = Map.lookup k store in
-        case v of Just u  -> case u of StoreIntValue x -> x
-                  Nothing -> error "No value associated with store location"
 
 emptyStore :: Store
 emptyStore = Map.empty
 
+generalSave :: Store -> StoreKey a -> StoreValue -> Store
+generalSave store (StoreKey k) x = Map.insert k x store
 
--- Abstract values.
+generalRetrieve :: Store -> StoreKey a -> StoreValue
+generalRetrieve store (StoreKey k) =
+    let v = Map.lookup k store in
+        case v of Just u  -> u
+                  Nothing -> error "No value associated with store location"
+
+class Storeable a where
+    save :: Store -> StoreKey a -> a -> Store
+    retrieve :: Store -> StoreKey a -> a
+
+instance Storeable Int where
+    save store k x = generalSave store k (StoreIntValue x)
+    retrieve store k = 
+        let v = generalRetrieve store k
+        in case v of StoreIntValue x -> x
+                     _ -> error "Wrong type in store"
+
+
+-- Abstract Int.
 data AbsInt = IntVal Int
             | IntVar (StoreKey Int)
             | OpPlus AbsInt AbsInt
@@ -61,7 +73,7 @@ instance Num AbsInt where
 
 evalAbsInt :: Store -> AbsInt -> Int
 evalAbsInt store (IntVal    x) = x
-evalAbsInt store (IntVar    k) = retrieveInt store k
+evalAbsInt store (IntVar    k) = retrieve store k
 evalAbsInt store (OpPlus  x y) = (evalAbsInt store x) + (evalAbsInt store y)
 evalAbsInt store (OpMinus x y) = (evalAbsInt store x) - (evalAbsInt store y)
 evalAbsInt store (OpMult  x y) = (evalAbsInt store x) * (evalAbsInt store y)
@@ -140,7 +152,7 @@ runCompTree (PrintIntEffect x comp, store) = do
     runCompTree (comp, store)
 runCompTree (ReadIntEffect k comp, store) = do
     line <- getLine
-    let store' = saveInt store k (read line)
+    let store' = save store k (read line)
     runCompTree (comp, store')
 
 runMigrationComp :: (Show a, Read a) => MigrationComp a -> IO a
