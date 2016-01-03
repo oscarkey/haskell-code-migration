@@ -1,16 +1,18 @@
 {-# LANGUAGE
     FlexibleContexts,
-    ConstraintKinds #-}
+    ConstraintKinds,
+    OverloadedStrings #-}
 
 import Migration
 
 registerComp :: MigrationComp ()
 registerComp = do 
     printStr "How many pupils are currently present?"
-    count <- readInt
+    count <- readStr
+    printStr "And what is your name?"
+    name <- readStr
     migrate "127.0.0.1"
-    printStr "The number of pupils present was:"
-    printInt count
+    printStr $ name +++ " says that the number of pupils present was " +++ count
     return ()
 
 main :: IO ()

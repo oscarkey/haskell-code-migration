@@ -153,28 +153,33 @@ instance AbsShow Int where
 -- Computation tree.
 data CompTree a = Result a
     | MigrateEffect HostName (CompTree a) 
-    | PrintStrEffect String (CompTree a)
+    | PrintStrEffect AbsString (CompTree a)
     | PrintIntEffect AbsInt (CompTree a)
+    | ReadStrEffect (StoreKey [Char]) (CompTree a)
     | ReadIntEffect (StoreKey Int) (CompTree a)
     deriving (Show, Read)
 
 
 -- Handlers and reification.
 [operation|Migrate  :: HostName -> ()|]
-[operation|PrintStr :: String -> ()|]
+[operation|PrintStr :: AbsString -> ()|]
 [operation|PrintInt :: AbsInt -> ()|]
+[operation|ReadStr  :: AbsString|]
 [operation|ReadInt  :: AbsInt|]
 
-type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintInt, ReadInt}|])
+type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintInt, ReadStr, ReadInt}|])
                         => Comp h a
 
 [handler|
     ReifyComp a :: Int -> CompTree a
-        handles {Migrate, PrintStr, PrintInt, ReadInt} where
+        handles {Migrate, PrintStr, PrintInt, ReadStr, ReadInt} where
             Return          x i -> Result x
             Migrate    host k i -> MigrateEffect host (k () i)
             PrintStr    str k i -> PrintStrEffect str (k () i)
             PrintInt      x k i -> PrintIntEffect x (k () i)
+            ReadStr         k i -> 
+                let key = StoreKey i in 
+                ReadStrEffect key (k (ListVar key) (i+1))
             ReadInt         k i -> 
                 let key = StoreKey i in
                 ReadIntEffect key (k (IntVar key) (i+1))
@@ -205,11 +210,15 @@ runCompTree (MigrateEffect host comp, store) = do
     sendComp host (comp, store)
     listenForComp
 runCompTree (PrintStrEffect str comp, store) = do
-    putStrLn str
+    putStrLn $ ashow store str
     runCompTree (comp, store)
 runCompTree (PrintIntEffect x comp, store) = do
     putStrLn $ ashow store x
     runCompTree (comp, store)
+runCompTree (ReadStrEffect k comp, store) = do
+    line <- getLine
+    let store' = save store k line
+    runCompTree (comp, store')
 runCompTree (ReadIntEffect k comp, store) = do
     line <- getLine
     let store' = save store k (read line)
