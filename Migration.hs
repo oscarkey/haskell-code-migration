@@ -29,7 +29,8 @@ portNum = "8000"
 -- Store.
 data StoreKey a = StoreKey Int deriving (Show, Read)
 data StoreValue = StoreIntValue Int 
-                | StoreCharListValue [Char] 
+                | StoreStringValue String
+                | StoreStringListValue [String]
     deriving (Show, Read)
 type Store = Map.Map Int StoreValue
 
@@ -56,11 +57,18 @@ instance Storeable Int where
         in case v of StoreIntValue x -> x
                      _ -> error "Wrong type in store"
 
-instance Storeable [Char] where
-    save store k x = generalSave store k (StoreCharListValue x)
+instance Storeable String where
+    save store k x = generalSave store k (StoreStringValue x)
     retrieve store k = 
         let v = generalRetrieve store k
-        in case v of StoreCharListValue x -> x
+        in case v of StoreStringValue x -> x
+                     _ -> error "Wrong type in store"
+
+instance Storeable [String] where
+    save store k x = generalSave store k (StoreStringListValue x)
+    retrieve store k =
+        let v = generalRetrieve store k
+        in case v of StoreStringListValue x -> x
                      _ -> error "Wrong type in store"
 
 
@@ -112,16 +120,16 @@ instance IsList (AbsList a) where
     fromList (x:xs) = Cons x (fromList xs)
     toList xs = error "Cannot convert from AbsList to [] without store."
 
-instance IsString (AbsList Char) where
+instance IsString AbsString where
     fromString s = fromList s
 
 evalAbsList :: (Storeable [a]) => Store -> AbsList a -> [a]
 evalAbsList store          Nil = []
-evalAbsList store (ListVar  k) = retrieve store k
-evalAbsList store (Cons  x xs) = x : (evalAbsList store xs)
-evalAbsList store (Append x y) = (evalAbsList store x) ++ (evalAbsList store y)
-evalAbsList store (Take  n xs) = take n (evalAbsList store xs)
-evalAbsList store (Drop  n xs) = drop n (evalAbsList store xs)
+evalAbsList store (ListVar   k) = retrieve store k
+evalAbsList store (Cons   x xs) = x : (evalAbsList store xs)
+evalAbsList store (Append  x y) = (evalAbsList store x) ++ (evalAbsList store y)
+evalAbsList store (Take   n xs) = take n (evalAbsList store xs)
+evalAbsList store (Drop   n xs) = drop n (evalAbsList store xs)
 
 acons :: a -> AbsList a -> AbsList a
 acons x xs = Cons x xs
