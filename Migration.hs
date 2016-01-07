@@ -14,6 +14,7 @@
 
 module Migration where
 
+import Prelude hiding ((&&), (||), not)
 import Handlers
 import DesugarHandlers
 import Network.Simple.TCP (connect, listen, accept, HostPreference(Host), HostName)
@@ -21,6 +22,7 @@ import Network.Socket (recv, send)
 import qualified Data.Map.Strict as Map
 import Data.List
 import Data.String
+import Data.Boolean
 import GHC.Exts (IsList(Item, fromList, toList))
 
 portNum = "8000"
@@ -28,7 +30,8 @@ portNum = "8000"
 
 -- Store.
 data StoreKey a = StoreKey Int deriving (Show, Read)
-data StoreValue = StoreIntValue Int 
+data StoreValue = StoreIntValue Int
+                | StoreBoolValue Bool
                 | StoreStringValue String
                 | StoreStringListValue [String]
     deriving (Show, Read)
@@ -55,6 +58,13 @@ instance Storeable Int where
     retrieve store k = 
         let v = generalRetrieve store k
         in case v of StoreIntValue x -> x
+                     _ -> error "Wrong type in store"
+
+instance Storeable Bool where
+    save store k x = generalSave store k (StoreBoolValue x)
+    retrieve store k = 
+        let v = generalRetrieve store k
+        in case v of StoreBoolValue x -> x
                      _ -> error "Wrong type in store"
 
 instance Storeable String where
@@ -100,6 +110,31 @@ evalAbsInt store (OpPlus  x y) = (evalAbsInt store x) + (evalAbsInt store y)
 evalAbsInt store (OpMinus x y) = (evalAbsInt store x) - (evalAbsInt store y)
 evalAbsInt store (OpMult  x y) = (evalAbsInt store x) * (evalAbsInt store y)
 evalAbsInt store (OpSig     x) = signum $ evalAbsInt store x
+
+
+-- Abstract Bool.
+data AbsBool = BoolVal Bool
+             | BoolVar (StoreKey Bool)
+             | And AbsBool AbsBool
+             | Or AbsBool AbsBool
+             | Not AbsBool
+    deriving (Show, Read)
+
+instance BoolValue AbsBool where
+    true = BoolVal True
+    false = BoolVal False
+
+instance Boolean AbsBool where
+    (&&) x y = And x y
+    (||) x y = Or x y
+    not x = Not x
+
+evalAbsBool :: Store -> AbsBool -> Bool
+evalAbsBool store (BoolVal x) = x
+evalAbsBool store (BoolVar k) = retrieve store k
+evalAbsBool store (And   x y) = (evalAbsBool store x) && (evalAbsBool store y)
+evalAbsBool store (Or    x y) = (evalAbsBool store x) || (evalAbsBool store y)
+evalAbsBool store (Not     x) = not (evalAbsBool store x)
 
 
 -- Abstract lists.
@@ -150,6 +185,9 @@ class AbsShow a where
 
 instance AbsShow AbsInt where
     ashow store x = show $ evalAbsInt store x
+
+instance AbsShow AbsBool where
+    ashow store x = show $ evalAbsBool store x
 
 instance (Storeable [a], Show a) => AbsShow (AbsList a) where
     ashow store x = show $ evalAbsList store x
