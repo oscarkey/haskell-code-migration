@@ -30,12 +30,13 @@ portNum = "8000"
 
 -- Store.
 data StoreKey a = StoreKey Int deriving (Show, Read)
+type GenericStoreKey = Int
 data StoreValue = StoreIntValue Int
                 | StoreBoolValue Bool
                 | StoreStringValue String
                 | StoreStringListValue [String]
     deriving (Show, Read)
-type Store = Map.Map Int StoreValue
+type Store = Map.Map GenericStoreKey StoreValue
 
 emptyStore :: Store
 emptyStore = Map.empty
