@@ -25,6 +25,7 @@ import Data.String
 import Data.Boolean
 import GHC.Exts (IsList(Item, fromList, toList))
 
+
 portNum = "8000"
 
 
@@ -197,39 +198,66 @@ instance AbsShow Int where
     ashow store x = show x
 
 
+-- Abstract Eq.
+class AbsEq a where
+    (===) :: a -> a -> MigrationComp Bool
+
+instance AbsEq AbsInt where
+    (===) x y = equal (EqableAbsInt x, EqableAbsInt y)
+
+instance AbsEq AbsBool where
+    (===) x y = equal (EqableAbsBool x, EqableAbsBool y)
+
+instance AbsEq Int where
+    (===) x y = return $ x==y
+
+data AbsEqable = EqableAbsInt AbsInt | EqableAbsBool AbsBool
+    deriving (Show, Read)
+
+evalAbsEqable :: Store -> (AbsEqable,AbsEqable) -> Bool
+evalAbsEqable store (EqableAbsInt x, EqableAbsInt y) = 
+                                                    (evalAbsInt store x) == (evalAbsInt store y)
+evalAbsEqable store (EqableAbsBool x, EqableAbsBool y) = 
+                                                    (evalAbsBool store x) == (evalAbsBool store y)
+evalAbsEqable store (_,_) = error "Mismatched Eqable constructors"
+
+
 -- Computation tree.
 data CompTree a = Result a
-    | MigrateEffect HostName (CompTree a) 
+    | MigrateEffect HostName (CompTree a)
     | PrintStrEffect AbsString (CompTree a)
     | PrintIntEffect AbsInt (CompTree a)
     | ReadStrEffect (StoreKey [Char]) (CompTree a)
     | ReadIntEffect (StoreKey Int) (CompTree a)
+    | EqualEffect (AbsEqable,AbsEqable) (CompTree a) (CompTree a)
     deriving (Show, Read)
 
 
 -- Handlers and reification.
-[operation|Migrate  :: HostName -> ()|]
-[operation|PrintStr :: AbsString -> ()|]
-[operation|PrintInt :: AbsInt -> ()|]
-[operation|ReadStr  :: AbsString|]
-[operation|ReadInt  :: AbsInt|]
+[operation|Migrate     :: HostName -> ()|]
+[operation|PrintStr    :: AbsString -> ()|]
+[operation|PrintInt    :: AbsInt -> ()|]
+[operation|ReadStr     :: AbsString|]
+[operation|ReadInt     :: AbsInt|]
+[operation|Equal       :: (AbsEqable,AbsEqable) -> Bool|]
 
-type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintInt, ReadStr, ReadInt}|])
+type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintInt, ReadStr, ReadInt, Equal}|])
                         => Comp h a
 
 [handler|
     ReifyComp a :: Int -> CompTree a
-        handles {Migrate, PrintStr, PrintInt, ReadStr, ReadInt} where
-            Return          x i -> Result x
-            Migrate    host k i -> MigrateEffect host (k () i)
-            PrintStr    str k i -> PrintStrEffect str (k () i)
-            PrintInt      x k i -> PrintIntEffect x (k () i)
-            ReadStr         k i -> 
+        handles {Migrate, PrintStr, PrintInt, ReadStr, ReadInt, Equal} where
+            Return            x i -> Result x
+            Migrate      host k i -> MigrateEffect host (k () i)
+            PrintStr      str k i -> PrintStrEffect str (k () i)
+            PrintInt        x k i -> PrintIntEffect x (k () i)
+            ReadStr           k i -> 
                 let key = StoreKey i in 
                 ReadStrEffect key (k (ListVar key) (i+1))
-            ReadInt         k i -> 
+            ReadInt           k i -> 
                 let key = StoreKey i in
                 ReadIntEffect key (k (IntVar key) (i+1))
+            Equal       (x,y) k i -> EqualEffect (x,y) (k True i) (k False i)
 |]
 
 
@@ -270,6 +298,9 @@ runCompTree (ReadIntEffect k comp, store) = do
     line <- getLine
     let store' = save store k (read line)
     runCompTree (comp, store')
+runCompTree (EqualEffect (x,y) compt compf, store) = 
+    let comp' = if evalAbsEqable store (x,y) then compt else compf
+    in runCompTree (comp', store)
 
 runMigrationComp :: (Show a, Read a) => MigrationComp a -> IO a
 runMigrationComp comp = runCompTree (reifyComp 0 comp, emptyStore)
