@@ -36,6 +36,7 @@ data StoreValue = StoreIntValue Int
                 | StoreBoolValue Bool
                 | StoreStringValue String
                 | StoreStringListValue [String]
+                | StoreAbsStringListValue [AbsString]
     deriving (Show, Read)
 type Store = Map.Map GenericStoreKey StoreValue
 
@@ -81,6 +82,13 @@ instance Storeable [String] where
     retrieve store k =
         let v = generalRetrieve store k
         in case v of StoreStringListValue x -> x
+                     _ -> error "Wrong type in store"
+
+instance Storeable [AbsString] where
+    save store k x = generalSave store k (StoreAbsStringListValue x)
+    retrieve store k =
+        let v = generalRetrieve store k
+        in case v of StoreAbsStringListValue x -> x
                      _ -> error "Wrong type in store"
 
 
