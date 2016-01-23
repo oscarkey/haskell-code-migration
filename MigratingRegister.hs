@@ -10,9 +10,13 @@ readNames =
     let limited 0 = return Nil 
         limited x = do
             name <- readStr
-            rest <- limited (x-1)
-            return $ acons name rest
-    in limited 5
+            end <- name === "end"
+            if end then do
+                return Nil
+            else do
+                rest <- limited (x-1)
+                return $ acons name rest
+    in limited 20
 
 registerComp :: MigrationComp ()
 registerComp = do
@@ -22,7 +26,7 @@ registerComp = do
     names <- readNames
     migrate "127.0.0.1"
     printStr $ "The people present in class " +++ className +++ " are:"
-    -- Print the list of people present
+    printStrList names
     return ()
 
 main :: IO ()
