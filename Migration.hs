@@ -220,7 +220,10 @@ instance AbsEq AbsBool where
 instance AbsEq Int where
     (===) x y = return $ x==y
 
-data AbsEqable = EqableAbsInt AbsInt | EqableAbsBool AbsBool
+instance AbsEq AbsString where
+    (===) x y = equal (EqableAbsString x, EqableAbsString y)
+
+data AbsEqable = EqableAbsInt AbsInt | EqableAbsBool AbsBool | EqableAbsString AbsString
     deriving (Show, Read)
 
 evalAbsEqable :: Store -> (AbsEqable,AbsEqable) -> Bool
@@ -228,6 +231,8 @@ evalAbsEqable store (EqableAbsInt x, EqableAbsInt y) =
                                                     (evalAbsInt store x) == (evalAbsInt store y)
 evalAbsEqable store (EqableAbsBool x, EqableAbsBool y) = 
                                                     (evalAbsBool store x) == (evalAbsBool store y)
+evalAbsEqable store (EqableAbsString x, EqableAbsString y) = 
+                                                    (evalAbsList store x) == (evalAbsList store y)
 evalAbsEqable store (_,_) = error "Mismatched Eqable constructors"
 
 
@@ -235,6 +240,7 @@ evalAbsEqable store (_,_) = error "Mismatched Eqable constructors"
 data CompTree a = Result a
     | MigrateEffect HostName (CompTree a)
     | PrintStrEffect AbsString (CompTree a)
+    | PrintStrListEffect (AbsList AbsString) (CompTree a)
     | PrintIntEffect AbsInt (CompTree a)
     | ReadStrEffect (StoreKey [Char]) (CompTree a)
     | ReadIntEffect (StoreKey Int) (CompTree a)
