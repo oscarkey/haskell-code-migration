@@ -23,6 +23,7 @@ import qualified Data.Map.Strict as Map
 import Data.List
 import Data.String
 import Data.Boolean
+import Data.Foldable
 import GHC.Exts (IsList(Item, fromList, toList))
 
 
@@ -242,22 +243,25 @@ data CompTree a = Result a
 
 
 -- Handlers and reification.
-[operation|Migrate     :: HostName -> ()|]
-[operation|PrintStr    :: AbsString -> ()|]
-[operation|PrintInt    :: AbsInt -> ()|]
-[operation|ReadStr     :: AbsString|]
-[operation|ReadInt     :: AbsInt|]
-[operation|Equal       :: (AbsEqable,AbsEqable) -> Bool|]
+[operation|Migrate      :: HostName -> ()|]
+[operation|PrintStr     :: AbsString -> ()|]
+[operation|PrintStrList :: AbsList AbsString -> ()|]
+[operation|PrintInt     :: AbsInt -> ()|]
+[operation|ReadStr      :: AbsString|]
+[operation|ReadInt      :: AbsInt|]
+[operation|Equal        :: (AbsEqable,AbsEqable) -> Bool|]
 
-type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintInt, ReadStr, ReadInt, Equal}|])
+type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, 
+                                    Equal}|])
                         => Comp h a
 
 [handler|
     ReifyComp a :: Int -> CompTree a
-        handles {Migrate, PrintStr, PrintInt, ReadStr, ReadInt, Equal} where
+        handles {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, Equal} where
             Return            x i -> Result x
             Migrate      host k i -> MigrateEffect host (k () i)
             PrintStr      str k i -> PrintStrEffect str (k () i)
+            PrintStrList strs k i -> PrintStrListEffect strs (k () i)
             PrintInt        x k i -> PrintIntEffect x (k () i)
             ReadStr           k i -> 
                 let key = StoreKey i in 
@@ -294,6 +298,10 @@ runCompTree (MigrateEffect host comp, store) = do
     listenForComp
 runCompTree (PrintStrEffect str comp, store) = do
     putStrLn $ ashow store str
+    runCompTree (comp, store)
+runCompTree (PrintStrListEffect strs comp, store) = do
+    let strs' = evalAbsList store strs
+    traverse_ (\str -> putStrLn $ ashow store str) strs'
     runCompTree (comp, store)
 runCompTree (PrintIntEffect x comp, store) = do
     putStrLn $ ashow store x
