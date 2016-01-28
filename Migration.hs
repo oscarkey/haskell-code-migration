@@ -62,35 +62,35 @@ instance Storeable Int where
     retrieve store k = 
         let v = generalRetrieve store k
         in case v of StoreIntValue x -> x
-                     _ -> error "Wrong type in store"
+                     _ -> error "Wrong type in store, expected Int"
 
 instance Storeable Bool where
     save store k x = generalSave store k (StoreBoolValue x)
     retrieve store k = 
         let v = generalRetrieve store k
         in case v of StoreBoolValue x -> x
-                     _ -> error "Wrong type in store"
+                     _ -> error "Wrong type in store, expected Bool"
 
 instance Storeable String where
     save store k x = generalSave store k (StoreStringValue x)
     retrieve store k = 
         let v = generalRetrieve store k
         in case v of StoreStringValue x -> x
-                     _ -> error "Wrong type in store"
+                     _ -> error "Wrong type in store, expected String"
 
 instance Storeable [String] where
     save store k x = generalSave store k (StoreStringListValue x)
     retrieve store k =
         let v = generalRetrieve store k
         in case v of StoreStringListValue x -> x
-                     _ -> error "Wrong type in store"
+                     _ -> error "Wrong type in store, expected [String]"
 
 instance Storeable [AbsString] where
     save store k x = generalSave store k (StoreAbsStringListValue x)
     retrieve store k =
         let v = generalRetrieve store k
         in case v of StoreAbsStringListValue x -> x
-                     _ -> error "Wrong type in store"
+                     _ -> error "Wrong type in store, expected [AbsString]"
 
 
 -- Abstract Int.
