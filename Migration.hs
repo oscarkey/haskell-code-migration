@@ -170,7 +170,7 @@ instance IsString AbsString where
     fromString s = fromList s
 
 evalAbsList :: (Storeable [a]) => Store -> AbsList a -> [a]
-evalAbsList store          Nil = []
+evalAbsList store           Nil = []
 evalAbsList store (ListVar   k) = retrieve store k
 evalAbsList store (Cons   x xs) = x : (evalAbsList store xs)
 evalAbsList store (Append  x y) = (evalAbsList store x) ++ (evalAbsList store y)
