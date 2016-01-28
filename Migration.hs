@@ -286,43 +286,46 @@ listenForComp = listen (Host "127.0.0.1") portNum $ \(socket, socketAddress) -> 
     accept socket $ \(socket, remoteAddress) -> do
         str <- recv socket 4096
         putStrLn "Received computation, running it"
-        let (comp, store) = (read str :: (Show a, Read a) => (CompTree a, Store))
-        runCompTree (comp, store)
+        let (store, comp) = (read str :: (Show a, Read a) => (Store, CompTree a))
+        (store', x) <- runCompTree (store, comp)
+        return x
 
-sendComp :: (Show a, Read a) => HostName -> (CompTree a, Store) -> IO Int
-sendComp hostName (comp, store) = do 
+sendComp :: (Show a, Read a) => HostName -> (Store, CompTree a) -> IO Int
+sendComp hostName (store, comp) = do 
     connect hostName portNum $ \(socket, remoteAddress) -> do
         putStrLn $ "Sending computation to " ++ hostName
-        send socket $ show (comp, store)
+        send socket $ show (store, comp)
 
 
 -- Interpreter.
-runCompTree :: (Show a, Read a) => (CompTree a, Store) -> IO a
-runCompTree (Result x, store) = return x
-runCompTree (MigrateEffect host comp, store) = do
-    sendComp host (comp, store)
+runCompTree :: (Show a, Read a) => (Store, CompTree a) -> IO (Store, a)
+runCompTree (store, Result x) = return (store, x)
+runCompTree (store, MigrateEffect host comp) = do
+    sendComp host (store, comp)
     listenForComp
-runCompTree (PrintStrEffect str comp, store) = do
+runCompTree (store, PrintStrEffect str comp) = do
     putStrLn $ ashow store str
-    runCompTree (comp, store)
-runCompTree (PrintStrListEffect strs comp, store) = do
+    runCompTree (store, comp)
+runCompTree (store, PrintStrListEffect strs comp) = do
     let strs' = evalAbsList store strs
     traverse_ (\str -> putStrLn $ ashow store str) strs'
-    runCompTree (comp, store)
-runCompTree (PrintIntEffect x comp, store) = do
+    runCompTree (store, comp)
+runCompTree (store, PrintIntEffect x comp) = do
     putStrLn $ ashow store x
-    runCompTree (comp, store)
-runCompTree (ReadStrEffect k comp, store) = do
+    runCompTree (store, comp)
+runCompTree (store, ReadStrEffect k comp) = do
     line <- getLine
     let store' = save store k line
-    runCompTree (comp, store')
-runCompTree (ReadIntEffect k comp, store) = do
+    runCompTree (store', comp)
+runCompTree (store, ReadIntEffect k comp) = do
     line <- getLine
     let store' = save store k (read line)
-    runCompTree (comp, store')
-runCompTree (EqualEffect (x,y) compt compf, store) = 
+    runCompTree (store', comp)
+runCompTree (store, EqualEffect (x,y) compt compf) = 
     let comp' = if evalAbsEqable store (x,y) then compt else compf
-    in runCompTree (comp', store)
+    in runCompTree (store, comp')
 
 runMigrationComp :: (Show a, Read a) => MigrationComp a -> IO a
-runMigrationComp comp = runCompTree (reifyComp 0 comp, emptyStore)
+runMigrationComp comp = do
+    (store, x) <- runCompTree (emptyStore, reifyComp 0 comp)
+    return x
