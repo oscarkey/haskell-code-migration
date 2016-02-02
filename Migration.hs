@@ -14,16 +14,16 @@
 
 module Migration where
 
-import Prelude hiding ((&&), (||), not)
+import Prelude hiding ((&&), (||), not, iterate)
 import Handlers
 import DesugarHandlers
 import Network.Simple.TCP (connect, listen, accept, HostPreference(Host), HostName)
 import Network.Socket (recv, send)
 import qualified Data.Map.Strict as Map
-import Data.List
+import Data.List hiding (iterate)
 import Data.String
 import Data.Boolean
-import Data.Foldable
+import Data.Foldable (traverse_)
 import GHC.Exts (IsList(Item, fromList, toList))
 
 
@@ -36,6 +36,7 @@ type GenericStoreKey = Int
 data StoreValue = StoreIntValue Int
                 | StoreBoolValue Bool
                 | StoreStringValue String
+                | StoreAbsStringValue AbsString
                 | StoreStringListValue [String]
                 | StoreAbsStringListValue [AbsString]
     deriving (Show, Read)
@@ -77,6 +78,13 @@ instance Storeable String where
         let v = generalRetrieve store k
         in case v of StoreStringValue x -> x
                      _ -> error "Wrong type in store, expected String"
+
+instance Storeable AbsString where
+    save store k x = generalSave store k (StoreAbsStringValue x)
+    retrieve store k =
+        let v = generalRetrieve store k
+        in case v of StoreAbsStringValue x -> x
+                     _ -> error "Wrong type in store, expected AbsString"
 
 instance Storeable [String] where
     save store k x = generalSave store k (StoreStringListValue x)
@@ -190,6 +198,22 @@ adrop :: Int -> AbsList a -> AbsList a
 adrop n xs = Drop n xs
 
 
+-- Abstract iteration
+forEach :: (AbsString -> MigrationComp ()) -> AbsList AbsString -> MigrationComp ()
+forEach f xs =
+    let k = StoreKey 2000
+    in let rf = reifyComp 1000 (f (ListVar k))
+    in iterate (rf, xs, k)
+
+forEvery :: UnitCompTree -> [AbsString] -> Store -> StoreKey String -> IO Store
+forEvery f [] store k = return store
+forEvery f (x:xs) store k = do
+    let str = evalAbsList store x
+    let store' = save store k str
+    (store'', _) <- runCompTree (store', f)
+    forEvery f xs store'' k
+
+
 -- Abstract Show.
 class AbsShow a where
     ashow :: Store -> a -> String
@@ -245,7 +269,10 @@ data CompTree a = Result a
     | ReadStrEffect (StoreKey [Char]) (CompTree a)
     | ReadIntEffect (StoreKey Int) (CompTree a)
     | EqualEffect (AbsEqable,AbsEqable) (CompTree a) (CompTree a)
+    | IterateEffect (CompTree (),AbsList AbsString,StoreKey String) (CompTree a)
     deriving (Show, Read)
+-- UnitCompTree sometimes has to be used in place of CompTree (), this needs to be investigated.
+type UnitCompTree = CompTree ()
 
 
 -- Handlers and reification.
@@ -256,14 +283,15 @@ data CompTree a = Result a
 [operation|ReadStr      :: AbsString|]
 [operation|ReadInt      :: AbsInt|]
 [operation|Equal        :: (AbsEqable,AbsEqable) -> Bool|]
+[operation|Iterate      :: (UnitCompTree,AbsList AbsString,StoreKey String) -> ()|]
 
 type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, 
-                                    Equal}|])
+                                    Equal, Iterate}|])
                         => Comp h a
 
 [handler|
     ReifyComp a :: Int -> CompTree a
-        handles {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, Equal} where
+        handles {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, Equal, Iterate} where
             Return            x i -> Result x
             Migrate      host k i -> MigrateEffect host (k () i)
             PrintStr      str k i -> PrintStrEffect str (k () i)
@@ -276,6 +304,7 @@ type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintStrList, PrintInt, R
                 let key = StoreKey i in
                 ReadIntEffect key (k (IntVar key) (i+1))
             Equal       (x,y) k i -> EqualEffect (x,y) (k True i) (k False i)
+            Iterate  (f,xs,x) k i -> IterateEffect (f,xs,x) (k () i)
 |]
 
 
@@ -324,6 +353,10 @@ runCompTree (store, ReadIntEffect k comp) = do
 runCompTree (store, EqualEffect (x,y) compt compf) = 
     let comp' = if evalAbsEqable store (x,y) then compt else compf
     in runCompTree (store, comp')
+runCompTree (store, IterateEffect (f,xs,k) comp) = do
+    let xs' = evalAbsList store xs
+    store' <- forEvery f xs' store k
+    runCompTree (store', comp)
 
 runMigrationComp :: (Show a, Read a) => MigrationComp a -> IO a
 runMigrationComp comp = do

@@ -1,7 +1,8 @@
 {-# LANGUAGE
     FlexibleContexts,
     ConstraintKinds,
-    OverloadedStrings #-}
+    OverloadedStrings,
+    RankNTypes #-}
 
 import Migration
 
@@ -22,11 +23,11 @@ registerComp :: MigrationComp ()
 registerComp = do
     printStr "Which class is this?"
     className <- readStr
-    printStr "Enter the present student names: (max 5)"
+    printStr "Enter the present student names: ('end' to finish)"
     names <- readNames
     migrate "127.0.0.1"
     printStr $ "The people present in class " +++ className +++ " are:"
-    printStrList names
+    forEach (\name -> printStr name) names
     return ()
 
 main :: IO ()
