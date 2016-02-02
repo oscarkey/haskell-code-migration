@@ -204,6 +204,11 @@ forEach f xs =
     let k = StoreKey 2000
     in let rf = reifyComp 1000 (f (ListVar k))
     in iterate (rf, xs, k)
+forEach f xs = do
+    fresh <- freshVar
+    let k = StoreKey fresh
+    let rf = reifyComp (fresh*10000) (f (ListVar k))
+    iterate (rf, xs, k)
 
 forEvery :: UnitCompTree -> [AbsString] -> Store -> StoreKey String -> IO Store
 forEvery f [] store k = return store
@@ -284,14 +289,16 @@ type UnitCompTree = CompTree ()
 [operation|ReadInt      :: AbsInt|]
 [operation|Equal        :: (AbsEqable,AbsEqable) -> Bool|]
 [operation|Iterate      :: (UnitCompTree,AbsList AbsString,StoreKey String) -> ()|]
+[operation|FreshVar     :: GenericStoreKey|]
 
 type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, 
-                                    Equal, Iterate}|])
+                                    Equal, Iterate, FreshVar}|])
                         => Comp h a
 
 [handler|
-    ReifyComp a :: Int -> CompTree a
-        handles {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, Equal, Iterate} where
+    ReifyComp a :: GenericStoreKey -> CompTree a
+        handles {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, Equal, Iterate, 
+                 FreshVar} where
             Return            x i -> Result x
             Migrate      host k i -> MigrateEffect host (k () i)
             PrintStr      str k i -> PrintStrEffect str (k () i)
@@ -305,6 +312,7 @@ type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintStrList, PrintInt, R
                 ReadIntEffect key (k (IntVar key) (i+1))
             Equal       (x,y) k i -> EqualEffect (x,y) (k True i) (k False i)
             Iterate  (f,xs,x) k i -> IterateEffect (f,xs,x) (k () i)
+            FreshVar          k i -> k i (i+1)
 |]
 
 
