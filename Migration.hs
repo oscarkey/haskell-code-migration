@@ -301,8 +301,8 @@ type UnitCompTree = CompTree ()
 [operation|PrintInt     :: AbsInt -> ()|]
 [operation|ReadStr      :: AbsString|]
 [operation|ReadInt      :: AbsInt|]
-[operation|Equal        :: (AbsEqable,AbsEqable) -> Bool|]
-[operation|Iterate      :: (UnitCompTree,AbsList AbsString,StoreKey String) -> ()|]
+[operation|Equal        :: (AbsEqable, AbsEqable) -> Bool|]
+[operation|Iterate      :: (UnitCompTree, AbsList AbsString, StoreKey String) -> ()|]
 [operation|Hd           :: AbsList AbsString -> Maybe AbsString|]
 [operation|FreshVar     :: GenericStoreKey|]
 
@@ -320,11 +320,11 @@ type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintStrList, PrintInt, R
             PrintStrList strs k i -> PrintStrListEffect strs (k () i)
             PrintInt        x k i -> PrintIntEffect x (k () i)
             ReadStr           k i -> 
-                let key = StoreKey i in 
-                ReadStrEffect key (k (ListVar key) (i+1))
+                let key = StoreKey i
+                in ReadStrEffect key (k (ListVar key) (i+1))
             ReadInt           k i -> 
-                let key = StoreKey i in
-                ReadIntEffect key (k (IntVar key) (i+1))
+                let key = StoreKey i
+                in ReadIntEffect key (k (IntVar key) (i+1))
             Equal       (x,y) k i -> EqualEffect (x,y) (k True i) (k False i)
             Iterate  (f,xs,x) k i -> IterateEffect (f,xs,x) (k () i)
             Hd             xs k i ->
