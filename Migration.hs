@@ -27,9 +27,6 @@ import Data.Foldable (traverse_)
 import GHC.Exts (IsList(Item, fromList, toList))
 
 
-portNum = "8000"
-
-
 -- Store.
 data StoreKey a = StoreKey Int deriving (Show, Read)
 type GenericStoreKey = Int
@@ -221,13 +218,13 @@ forEach f xs = do
     let rf = reifyComp (fresh*10000) (f (ListVar k))
     iterate (rf, xs, k)
 
-forEvery :: UnitCompTree -> [AbsString] -> Store -> StoreKey String -> IO ()
-forEvery f [] store k = return ()
-forEvery f (x:xs) store k = do
+forEvery :: Port -> UnitCompTree -> [AbsString] -> Store -> StoreKey String -> IO ()
+forEvery port f [] store k = return ()
+forEvery port f (x:xs) store k = do
     let str = evalAbsList store x
     let store' = save store k str
-    runCompTree (store', f)
-    forEvery f xs store k
+    runCompTree port (store', f)
+    forEvery port f xs store k
 
 
 -- Abstract Show.
@@ -280,7 +277,7 @@ evalAbsEqable store (_,_) = error "Mismatched Eqable constructors"
 
 -- Computation tree.
 data CompTree a = Result a
-    | MigrateEffect HostName (CompTree a)
+    | MigrateEffect (HostName, Port) (CompTree a)
     | PrintStrEffect AbsString (CompTree a)
     | PrintStrListEffect (AbsList AbsString) (CompTree a)
     | PrintIntEffect AbsInt (CompTree a)
@@ -295,7 +292,7 @@ type UnitCompTree = CompTree ()
 
 
 -- Handlers and reification.
-[operation|Migrate      :: HostName -> ()|]
+[operation|Migrate      :: (HostName, Port) -> ()|]
 [operation|PrintStr     :: AbsString -> ()|]
 [operation|PrintStrList :: AbsList AbsString -> ()|]
 [operation|PrintInt     :: AbsInt -> ()|]
@@ -315,7 +312,7 @@ type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintStrList, PrintInt, R
         handles {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, Equal, Iterate, Hd,
                  FreshVar} where
             Return            x i -> Result x
-            Migrate      host k i -> MigrateEffect host (k () i)
+            Migrate    (h, p) k i -> MigrateEffect (h, p) (k () i)
             PrintStr      str k i -> PrintStrEffect str (k () i)
             PrintStrList strs k i -> PrintStrListEffect strs (k () i)
             PrintInt        x k i -> PrintIntEffect x (k () i)
@@ -336,63 +333,66 @@ type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintStrList, PrintInt, R
 
 
 -- Networking.
-listenForComp :: (Show a, Read a) => IO a
-listenForComp = listen (Host "127.0.0.1") portNum $ \(socket, socketAddress) -> do
+type Port = String
+
+listenForComp :: (Show a, Read a) => Port -> IO a
+listenForComp port = listen (Host "127.0.0.1") port $ \(socket, socketAddress) -> do
     putStrLn "Listening for incoming connections..."
     accept socket $ \(socket, remoteAddress) -> do
         str <- recv socket 4096
         putStrLn "Received computation, running it"
         let (store, comp) = (read str :: (Show a, Read a) => (Store, CompTree a))
-        (store', x) <- runCompTree (store, comp)
+        (store', x) <- runCompTree port (store, comp)
         return x
 
-sendComp :: (Show a, Read a) => HostName -> (Store, CompTree a) -> IO Int
-sendComp hostName (store, comp) = do 
-    connect hostName portNum $ \(socket, remoteAddress) -> do
+sendComp :: (Show a, Read a) => (HostName, Port) -> (Store, CompTree a) -> IO Int
+sendComp (hostName, port) (store, comp) = do 
+    connect hostName port $ \(socket, remoteAddress) -> do
         putStrLn $ "Sending computation to " ++ hostName
         send socket $ show (store, comp)
 
 
 -- Interpreter.
-runCompTree :: (Show a, Read a) => (Store, CompTree a) -> IO (Store, a)
-runCompTree (store, Result x) = return (store, x)
-runCompTree (store, MigrateEffect host comp) = do
-    sendComp host (store, comp)
-    listenForComp
-runCompTree (store, PrintStrEffect str comp) = do
-    putStrLn $ ashow store str
-    runCompTree (store, comp)
-runCompTree (store, PrintStrListEffect strs comp) = do
-    let strs' = evalAbsList store strs
-    traverse_ (\str -> putStrLn $ ashow store str) strs'
-    runCompTree (store, comp)
-runCompTree (store, PrintIntEffect x comp) = do
-    putStrLn $ ashow store x
-    runCompTree (store, comp)
-runCompTree (store, ReadStrEffect k comp) = do
-    line <- getLine
-    let store' = save store k line
-    runCompTree (store', comp)
-runCompTree (store, ReadIntEffect k comp) = do
-    line <- getLine
-    let store' = save store k (read line)
-    runCompTree (store', comp)
-runCompTree (store, EqualEffect (x,y) compt compf) = 
-    if evalAbsEqable store (x,y) then runCompTree (store, compt) 
-                                 else runCompTree (store, compf)
-runCompTree (store, IterateEffect (f,xs,k) comp) = do
-    let xs' = evalAbsList store xs
-    forEvery f xs' store k
-    runCompTree (store, comp)
-runCompTree (store, HdEffect xs k compt compf) = 
-    let xs' = evalAbsList store xs
-    in case xs' of [] -> runCompTree (store, compf)
-                   (x:xs) -> do
-                        let x' = evalAbsList store x
-                            store' = save store k x'
-                        runCompTree (store', compt)
+runCompTree :: (Show a, Read a) => Port -> (Store, CompTree a) -> IO (Store, a)
+runCompTree port (store, effect) = case effect of
+    Result x -> return (store, x)
+    MigrateEffect (dhost, dport) comp -> do
+        sendComp (dhost, dport) (store, comp)
+        listenForComp port
+    PrintStrEffect str comp -> do
+        putStrLn $ ashow store str
+        runCompTree port (store, comp)
+    PrintStrListEffect strs comp -> do
+        let strs' = evalAbsList store strs
+        traverse_ (\str -> putStrLn $ ashow store str) strs'
+        runCompTree port (store, comp)
+    PrintIntEffect x comp -> do
+        putStrLn $ ashow store x
+        runCompTree port (store, comp)
+    ReadStrEffect k comp -> do
+        line <- getLine
+        let store' = save store k line
+        runCompTree port (store', comp)
+    ReadIntEffect k comp -> do
+        line <- getLine
+        let store' = save store k (read line)
+        runCompTree port (store', comp)
+    EqualEffect (x,y) compt compf -> 
+        if evalAbsEqable store (x,y) then runCompTree port (store, compt) 
+                                     else runCompTree port (store, compf)
+    IterateEffect (f,xs,k) comp -> do
+        let xs' = evalAbsList store xs
+        forEvery port f xs' store k
+        runCompTree port (store, comp)
+    HdEffect xs k compt compf -> 
+        let xs' = evalAbsList store xs
+        in case xs' of [] -> runCompTree port (store, compf)
+                       (x:xs) -> do
+                            let x' = evalAbsList store x
+                                store' = save store k x'
+                            runCompTree port (store', compt)
 
-runMigrationComp :: (Show a, Read a) => MigrationComp a -> IO a
-runMigrationComp comp = do
-    (store, x) <- runCompTree (emptyStore, reifyComp 0 comp)
+runMigrationComp :: (Show a, Read a) => Port -> MigrationComp a -> IO a
+runMigrationComp port comp = do
+    (store, x) <- runCompTree port (emptyStore, reifyComp 0 comp)
     return x
