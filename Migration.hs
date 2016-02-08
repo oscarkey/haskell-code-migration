@@ -256,7 +256,9 @@ instance AbsEq Int where
 instance AbsEq AbsString where
     (===) x y = equal (EqableAbsString x, EqableAbsString y)
 
-data AbsEqable = EqableAbsInt AbsInt | EqableAbsBool AbsBool | EqableAbsString AbsString
+data AbsEqable = EqableAbsInt AbsInt 
+               | EqableAbsBool AbsBool
+               | EqableAbsString AbsString
     deriving (Show, Read)
 
 evalAbsEqable :: Store -> (AbsEqable,AbsEqable) -> Bool
@@ -363,8 +365,8 @@ runCompTree (store, ReadIntEffect k comp) = do
     let store' = save store k (read line)
     runCompTree (store', comp)
 runCompTree (store, EqualEffect (x,y) compt compf) = 
-    let comp' = if evalAbsEqable store (x,y) then compt else compf
-    in runCompTree (store, comp')
+    if evalAbsEqable store (x,y) then runCompTree (store, compt) 
+                                 else runCompTree (store, compf)
 runCompTree (store, IterateEffect (f,xs,k) comp) = do
     let xs' = evalAbsList store xs
     store' <- forEvery f xs' store k
