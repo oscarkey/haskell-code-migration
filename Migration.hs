@@ -171,6 +171,7 @@ data AbsList a = Nil
                | Append (AbsList a) (AbsList a)
                | Take Int (AbsList a)
                | Drop Int (AbsList a)
+               | Tail (AbsList a)
 deriving instance Show a => Show (AbsList a)
 deriving instance Read a => Read (AbsList a)
 
@@ -192,6 +193,9 @@ evalAbsList store (Cons   x xs) = x : (evalAbsList store xs)
 evalAbsList store (Append  x y) = (evalAbsList store x) ++ (evalAbsList store y)
 evalAbsList store (Take   n xs) = take n (evalAbsList store xs)
 evalAbsList store (Drop   n xs) = drop n (evalAbsList store xs)
+evalAbsList store (Tail     xs) = let xs' = evalAbsList store xs
+                                  in case xs' of [] -> []
+                                                 (y:ys) -> ys
 
 acons :: a -> AbsList a -> AbsList a
 acons x xs = Cons x xs
@@ -204,6 +208,9 @@ atake n xs = Take n xs
 
 adrop :: Int -> AbsList a -> AbsList a
 adrop n xs = Drop n xs
+
+tl :: AbsList a -> AbsList a
+tl xs = Tail xs
 
 
 -- Abstract iteration
@@ -279,8 +286,9 @@ data CompTree a = Result a
     | PrintIntEffect AbsInt (CompTree a)
     | ReadStrEffect (StoreKey [Char]) (CompTree a)
     | ReadIntEffect (StoreKey Int) (CompTree a)
-    | EqualEffect (AbsEqable,AbsEqable) (CompTree a) (CompTree a)
-    | IterateEffect (CompTree (),AbsList AbsString,StoreKey String) (CompTree a)
+    | EqualEffect (AbsEqable, AbsEqable) (CompTree a) (CompTree a)
+    | IterateEffect (CompTree (), AbsList AbsString, StoreKey String) (CompTree a)
+    | HdEffect (AbsList AbsString) (StoreKey String) (CompTree a) (CompTree a)
     deriving (Show, Read)
 -- UnitCompTree sometimes has to be used in place of CompTree (), this needs to be investigated.
 type UnitCompTree = CompTree ()
@@ -295,15 +303,16 @@ type UnitCompTree = CompTree ()
 [operation|ReadInt      :: AbsInt|]
 [operation|Equal        :: (AbsEqable,AbsEqable) -> Bool|]
 [operation|Iterate      :: (UnitCompTree,AbsList AbsString,StoreKey String) -> ()|]
+[operation|Hd           :: AbsList AbsString -> Maybe AbsString|]
 [operation|FreshVar     :: GenericStoreKey|]
 
 type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, 
-                                    Equal, Iterate, FreshVar}|])
+                                    Equal, Iterate, Hd, FreshVar}|])
                         => Comp h a
 
 [handler|
     ReifyComp a :: GenericStoreKey -> CompTree a
-        handles {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, Equal, Iterate, 
+        handles {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, Equal, Iterate, Hd,
                  FreshVar} where
             Return            x i -> Result x
             Migrate      host k i -> MigrateEffect host (k () i)
@@ -318,6 +327,10 @@ type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintStrList, PrintInt, R
                 ReadIntEffect key (k (IntVar key) (i+1))
             Equal       (x,y) k i -> EqualEffect (x,y) (k True i) (k False i)
             Iterate  (f,xs,x) k i -> IterateEffect (f,xs,x) (k () i)
+            Hd             xs k i ->
+                let key = StoreKey i
+                    x = Just (ListVar key)
+                in HdEffect xs key (k x (i+1)) (k Nothing i)
             FreshVar          k i -> k i (i+1)
 |]
 
@@ -371,6 +384,13 @@ runCompTree (store, IterateEffect (f,xs,k) comp) = do
     let xs' = evalAbsList store xs
     forEvery f xs' store k
     runCompTree (store, comp)
+runCompTree (store, HdEffect xs k compt compf) = 
+    let xs' = evalAbsList store xs
+    in case xs' of [] -> runCompTree (store, compf)
+                   (x:xs) -> do
+                        let x' = evalAbsList store x
+                            store' = save store k x'
+                        runCompTree (store', compt)
 
 runMigrationComp :: (Show a, Read a) => MigrationComp a -> IO a
 runMigrationComp comp = do
