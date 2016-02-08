@@ -35,6 +35,7 @@ data StoreKey a = StoreKey Int deriving (Show, Read)
 type GenericStoreKey = Int
 data StoreValue = StoreIntValue Int
                 | StoreBoolValue Bool
+                | StoreBoolListValue [Bool]
                 | StoreStringValue String
                 | StoreAbsStringValue AbsString
                 | StoreStringListValue [String]
@@ -71,6 +72,13 @@ instance Storeable Bool where
         let v = generalRetrieve store k
         in case v of StoreBoolValue x -> x
                      _ -> error "Wrong type in store, expected Bool"
+
+instance Storeable [Bool] where
+    save store k x = generalSave store k (StoreBoolListValue x)
+    retrieve store k = 
+        let v = generalRetrieve store k
+        in case v of StoreBoolListValue x -> x
+                     _ -> error "Wrong type in store, expected [Bool]"
 
 instance Storeable String where
     save store k x = generalSave store k (StoreStringValue x)
