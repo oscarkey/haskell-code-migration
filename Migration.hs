@@ -208,10 +208,6 @@ adrop n xs = Drop n xs
 
 -- Abstract iteration
 forEach :: (AbsString -> MigrationComp ()) -> AbsList AbsString -> MigrationComp ()
-forEach f xs =
-    let k = StoreKey 2000
-    in let rf = reifyComp 1000 (f (ListVar k))
-    in iterate (rf, xs, k)
 forEach f xs = do
     fresh <- freshVar
     let k = StoreKey fresh
