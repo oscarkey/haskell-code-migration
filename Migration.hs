@@ -214,13 +214,13 @@ forEach f xs = do
     let rf = reifyComp (fresh*10000) (f (ListVar k))
     iterate (rf, xs, k)
 
-forEvery :: UnitCompTree -> [AbsString] -> Store -> StoreKey String -> IO Store
-forEvery f [] store k = return store
+forEvery :: UnitCompTree -> [AbsString] -> Store -> StoreKey String -> IO ()
+forEvery f [] store k = return ()
 forEvery f (x:xs) store k = do
     let str = evalAbsList store x
     let store' = save store k str
-    (store'', _) <- runCompTree (store', f)
-    forEvery f xs store'' k
+    runCompTree (store', f)
+    forEvery f xs store k
 
 
 -- Abstract Show.
@@ -369,8 +369,8 @@ runCompTree (store, EqualEffect (x,y) compt compf) =
                                  else runCompTree (store, compf)
 runCompTree (store, IterateEffect (f,xs,k) comp) = do
     let xs' = evalAbsList store xs
-    store' <- forEvery f xs' store k
-    runCompTree (store', comp)
+    forEvery f xs' store k
+    runCompTree (store, comp)
 
 runMigrationComp :: (Show a, Read a) => MigrationComp a -> IO a
 runMigrationComp comp = do
