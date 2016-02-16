@@ -337,15 +337,15 @@ type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintStrList, PrintInt, R
 -- Networking.
 type Port = String
 
-listenForComp :: (Show a, Read a) => Port -> IO a
+listenForComp :: Port -> IO ()
 listenForComp port = listen (Host "127.0.0.1") port $ \(socket, socketAddress) -> do
     putStrLn "Listening for incoming connections..."
     accept socket $ \(socket, remoteAddress) -> do
         str <- recv socket 4096
         putStrLn "Received computation, running it"
-        let (store, comp) = (read str :: (Show a, Read a) => (Store, CompTree a))
-        (store', x) <- runCompTree port (store, comp)
-        return x
+        let (store, comp) = (read str :: (Store, CompTree ()))
+        runCompTree port (store, comp)
+        listenForComp port
 
 sendComp :: (Show a, Read a) => (HostName, Port) -> (Store, CompTree a) -> IO Int
 sendComp (hostName, port) (store, comp) = do 
@@ -355,12 +355,13 @@ sendComp (hostName, port) (store, comp) = do
 
 
 -- Interpreter.
-runCompTree :: (Show a, Read a) => Port -> (Store, CompTree a) -> IO (Store, a)
+runCompTree :: (Show a, Read a) => Port -> (Store, CompTree a) -> IO (Maybe (Store, a))
 runCompTree port (store, effect) = case effect of
-    Result x -> return (store, x)
+    Result x -> return $ Just (store, x)
     MigrateEffect (dhost, dport) comp -> do
         sendComp (dhost, dport) (store, comp)
         listenForComp port
+        return Nothing
     PrintStrEffect str comp -> do
         putStrLn $ ashow store str
         runCompTree port (store, comp)
@@ -394,7 +395,8 @@ runCompTree port (store, effect) = case effect of
                                 store' = save store k x'
                             runCompTree port (store', compt)
 
-runMigrationComp :: (Show a, Read a) => Port -> MigrationComp a -> IO a
+runMigrationComp :: Port -> MigrationComp () -> IO ()
 runMigrationComp port comp = do
-    (store, x) <- runCompTree port (emptyStore, reifyComp 0 comp)
-    return x
+    let comp' = reifyComp 0 comp
+    runCompTree port (emptyStore, comp')
+    return ()
