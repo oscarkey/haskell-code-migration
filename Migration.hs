@@ -163,6 +163,7 @@ evalAbsBool store (Not     x) = not (evalAbsBool store x)
 
 -- Abstract lists.
 data AbsList a = Nil
+               | ListVal [a]
                | ListVar (StoreKey [a])
                | Cons a (AbsList a)
                | Append (AbsList a) (AbsList a)
@@ -176,8 +177,8 @@ type AbsString = AbsList Char
 
 instance IsList (AbsList a) where
     type Item (AbsList a) = a
-    fromList     [] = Nil
-    fromList (x:xs) = Cons x (fromList xs)
+    fromList [] = Nil
+    fromList xs = ListVal xs
     toList xs = error "Cannot convert from AbsList to [] without store."
 
 instance IsString AbsString where
@@ -185,6 +186,7 @@ instance IsString AbsString where
 
 evalAbsList :: (Storeable [a]) => Store -> AbsList a -> [a]
 evalAbsList store           Nil = []
+evalAbsList store (ListVal  xs) = xs
 evalAbsList store (ListVar   k) = retrieve store k
 evalAbsList store (Cons   x xs) = x : (evalAbsList store xs)
 evalAbsList store (Append  x y) = (evalAbsList store x) ++ (evalAbsList store y)
