@@ -10,7 +10,8 @@
     ConstraintKinds,
     OverloadedLists,
     OverloadedStrings,
-    StandaloneDeriving #-}
+    StandaloneDeriving,
+    FunctionalDependencies #-}
 
 module Migration where
 
@@ -105,6 +106,17 @@ instance Storeable [AbsString] where
         in case v of StoreAbsStringListValue x -> x
                      _ -> error "Wrong type in store, expected [AbsString]"
 
+-- Abstract values.
+class Abstract a b | b -> a where
+    eval :: Store -> b -> a
+
+-- While these types are not abstract, it is helpful to map them to themselves so we can eval them.
+instance Abstract Int Int where
+    eval _ x = x
+
+instance Abstract [a] [a] where
+    eval _ x = x
+
 
 -- Abstract Int.
 data AbsInt = IntVal Int
@@ -127,13 +139,13 @@ instance Num AbsInt where
     abs x = x * (signum x)
     fromInteger x = IntVal (fromInteger x)
 
-evalAbsInt :: Store -> AbsInt -> Int
-evalAbsInt store (IntVal    x) = x
-evalAbsInt store (IntVar    k) = retrieve store k
-evalAbsInt store (OpPlus  x y) = (evalAbsInt store x) + (evalAbsInt store y)
-evalAbsInt store (OpMinus x y) = (evalAbsInt store x) - (evalAbsInt store y)
-evalAbsInt store (OpMult  x y) = (evalAbsInt store x) * (evalAbsInt store y)
-evalAbsInt store (OpSig     x) = signum $ evalAbsInt store x
+instance Abstract Int AbsInt where
+    eval store (IntVal    x) = x
+    eval store (IntVar    k) = retrieve store k
+    eval store (OpPlus  x y) = (eval store x) + (eval store y)
+    eval store (OpMinus x y) = (eval store x) - (eval store y)
+    eval store (OpMult  x y) = (eval store x) * (eval store y)
+    eval store (OpSig     x) = signum $ eval store x
 
 
 -- Abstract Bool.
@@ -153,12 +165,12 @@ instance Boolean AbsBool where
     (||) x y = Or x y
     not x = Not x
 
-evalAbsBool :: Store -> AbsBool -> Bool
-evalAbsBool store (BoolVal x) = x
-evalAbsBool store (BoolVar k) = retrieve store k
-evalAbsBool store (And   x y) = (evalAbsBool store x) && (evalAbsBool store y)
-evalAbsBool store (Or    x y) = (evalAbsBool store x) || (evalAbsBool store y)
-evalAbsBool store (Not     x) = not (evalAbsBool store x)
+instance Abstract Bool AbsBool where
+    eval store (BoolVal x) = x
+    eval store (BoolVar k) = retrieve store k
+    eval store (And   x y) = (eval store x) && (eval store y)
+    eval store (Or    x y) = (eval store x) || (eval store y)
+    eval store (Not     x) = not (eval store x)
 
 
 -- Abstract lists.
@@ -184,15 +196,15 @@ instance IsList (AbsList a) where
 instance IsString AbsString where
     fromString s = fromList s
 
-evalAbsList :: (Storeable [a]) => Store -> AbsList a -> [a]
-evalAbsList store           Nil = []
-evalAbsList store (ListVal  xs) = xs
-evalAbsList store (ListVar   k) = retrieve store k
-evalAbsList store (Cons   x xs) = x : (evalAbsList store xs)
-evalAbsList store (Append  x y) = (evalAbsList store x) ++ (evalAbsList store y)
-evalAbsList store (Take   n xs) = take n (evalAbsList store xs)
-evalAbsList store (Drop   n xs) = drop n (evalAbsList store xs)
-evalAbsList store (Tail     xs) = let xs' = evalAbsList store xs
+instance (Hetero [a]) => Abstract [a] (AbsList a) where
+    eval store           Nil = []
+    eval store (ListVal  xs) = xs
+    eval store (ListVar   k) = retrieve store k
+    eval store (Cons   x xs) = x : (eval store xs)
+    eval store (Append  x y) = (eval store x) ++ (eval store y)
+    eval store (Take   n xs) = take n (eval store xs)
+    eval store (Drop   n xs) = drop n (eval store xs)
+    eval store (Tail     xs) = let xs' = eval store xs
                                   in case xs' of [] -> []
                                                  (y:ys) -> ys
 
@@ -223,7 +235,7 @@ forEach f xs = do
 forEvery :: Port -> UnitCompTree -> [AbsString] -> Store -> StoreKey String -> IO ()
 forEvery port f [] store k = return ()
 forEvery port f (x:xs) store k = do
-    let str = evalAbsList store x
+    let str = eval store x
     let store' = save store k str
     runCompTree port (store', f)
     forEvery port f xs store k
@@ -234,13 +246,13 @@ class AbsShow a where
     ashow :: Store -> a -> String
 
 instance AbsShow AbsInt where
-    ashow store x = show $ evalAbsInt store x
+    ashow store x = show $ eval store x
 
 instance AbsShow AbsBool where
-    ashow store x = show $ evalAbsBool store x
+    ashow store x = show $ eval store x
 
 instance (Storeable [a], Show a) => AbsShow (AbsList a) where
-    ashow store x = show $ evalAbsList store x
+    ashow store x = show $ eval store x
 
 instance AbsShow Int where
     ashow store x = show x
@@ -268,12 +280,9 @@ data AbsEqable = EqableAbsInt AbsInt
     deriving (Show, Read)
 
 evalAbsEqable :: Store -> (AbsEqable,AbsEqable) -> Bool
-evalAbsEqable store (EqableAbsInt x, EqableAbsInt y) = 
-                                                    (evalAbsInt store x) == (evalAbsInt store y)
-evalAbsEqable store (EqableAbsBool x, EqableAbsBool y) = 
-                                                    (evalAbsBool store x) == (evalAbsBool store y)
-evalAbsEqable store (EqableAbsString x, EqableAbsString y) = 
-                                                    (evalAbsList store x) == (evalAbsList store y)
+evalAbsEqable store (EqableAbsInt x, EqableAbsInt y) = (eval store x) == (eval store y)
+evalAbsEqable store (EqableAbsBool x, EqableAbsBool y) = (eval store x) == (eval store y)
+evalAbsEqable store (EqableAbsString x, EqableAbsString y) = (eval store x) == (eval store y)
 evalAbsEqable store (_,_) = error "Mismatched Eqable constructors"
 
 
@@ -366,7 +375,7 @@ runCompTree port (store, effect) = case effect of
         putStrLn $ ashow store str
         runCompTree port (store, comp)
     PrintStrListEffect strs comp -> do
-        let strs' = evalAbsList store strs
+        let strs' = eval store strs
         traverse_ (\str -> putStrLn $ ashow store str) strs'
         runCompTree port (store, comp)
     PrintIntEffect x comp -> do
@@ -384,14 +393,14 @@ runCompTree port (store, effect) = case effect of
         if evalAbsEqable store (x,y) then runCompTree port (store, compt) 
                                      else runCompTree port (store, compf)
     IterateEffect (f,xs,k) comp -> do
-        let xs' = evalAbsList store xs
+        let xs' = eval store xs
         forEvery port f xs' store k
         runCompTree port (store, comp)
     HdEffect xs k compt compf -> 
-        let xs' = evalAbsList store xs
+        let xs' = eval store xs
         in case xs' of [] -> runCompTree port (store, compf)
                        (x:xs) -> do
-                            let x' = evalAbsList store x
+                            let x' = eval store x
                                 store' = save store k x'
                             runCompTree port (store', compt)
 
