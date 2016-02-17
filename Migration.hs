@@ -350,7 +350,7 @@ listenForComp :: Port -> IO ()
 listenForComp port = listen (Host "127.0.0.1") port $ \(socket, socketAddress) -> do
     putStrLn "Listening for incoming connections..."
     accept socket $ \(socket, remoteAddress) -> do
-        str <- recv socket 4096
+        str <- recv socket 65536
         putStrLn "Received computation, running it"
         let (store, comp) = (read str :: (Store, CompTree ()))
         runCompTree port (store, comp)
