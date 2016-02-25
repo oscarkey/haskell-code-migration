@@ -196,7 +196,7 @@ instance IsList (AbsList a) where
 instance IsString AbsString where
     fromString s = fromList s
 
-instance (Hetero [a]) => Abstract [a] (AbsList a) where
+instance (Storeable [a]) => Abstract [a] (AbsList a) where
     eval store           Nil = []
     eval store (ListVal  xs) = xs
     eval store (ListVar   k) = retrieve store k
