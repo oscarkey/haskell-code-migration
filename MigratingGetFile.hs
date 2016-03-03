@@ -29,25 +29,37 @@ listFilesComp port fileHost = do
 	forEach (\fileName -> printStr fileName) files
 
 
-getFileComp :: Port -> AbsHostName -> AbsFileName -> MigrationComp ()
-getFileComp port fileHost fileName = do
+getFileComp :: Port -> AbsHostName -> AbsList AbsFileName -> MigrationComp ()
+getFileComp port fileHost fileNames = do
 	printStr "Please enter your username:"
 	username <- readStr
 	printStr "Please enter your password:"
 	password <- readStr
 	migrate (authServer, authPort)
-	printStr $ username +++ " is trying to access file " +++ fileName +++ " on server " +++ fileHost
+	printStr $ username +++ " is trying to access files on server " +++ fileHost
 	migrate (fileHost, filePort)
-	file <- readFl fileName
+	files <- readFiles fileNames
 	migrate ("127.0.0.1", "8001")
-	printStr file
+	forEach (\file -> printStr file) files
 
+readFiles :: AbsList AbsFileName -> MigrationComp (AbsList AbsString)
+readFiles fileNames =
+    let limited 0 _ = return Nil
+        limited n files = do
+            file <- hd files
+            case file of Nothing -> return Nil
+                         Just f -> do
+                            text <- readFl f
+                            rest <- limited (n-1) (tl files)
+                            return $ acons text rest
+    in limited (10::Int) fileNames
 
 main :: IO ()
 main = do
 	args <- getArgs
 	case args of
 		[port, fileHost] -> runMigrationComp port $ listFilesComp port (toAbs fileHost)
-		[port, fileHost, fileName] -> 
-			runMigrationComp port $ getFileComp port (toAbs fileHost) (toAbs fileName)
+		(port : fileHost : files) -> 
+			let absFiles = toAbs $ map (\file -> toAbs file) files
+			in runMigrationComp port $ getFileComp port (toAbs fileHost) absFiles
 		_ -> error "Please provide arguments [port] [server address] ([file name])"
