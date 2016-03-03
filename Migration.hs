@@ -33,6 +33,7 @@ data StoreKey a = StoreKey Int deriving (Show, Read)
 type GenericStoreKey = Int
 data StoreValue = StoreIntValue Int
                 | StoreBoolValue Bool
+                | StoreCharValue Char
                 | StoreBoolListValue [Bool]
                 | StoreStringValue String
                 | StoreAbsStringValue AbsString
@@ -69,6 +70,13 @@ instance Storeable Bool where
     retrieve store k = 
         let v = generalRetrieve store k
         in case v of StoreBoolValue x -> x
+                     _ -> error "Wrong type in store, expected Bool"
+
+instance Storeable Char where
+    save store k x = generalSave store k (StoreCharValue x)
+    retrieve store k = 
+        let v = generalRetrieve store k
+        in case v of StoreCharValue x -> x
                      _ -> error "Wrong type in store, expected Bool"
 
 instance Storeable [Bool] where
@@ -178,6 +186,17 @@ instance Abstract Bool AbsBool where
     toAbs x = BoolVal x
 
 
+-- Abstract Char.
+data AbsChar = CharVal Char
+             | CharVar (StoreKey Char)
+    deriving (Show, Read)
+
+instance Abstract Char AbsChar where
+    eval store (CharVal x) = x
+    eval store (CharVar k) = retrieve store k
+    toAbs x = CharVal x
+
+
 -- Abstract lists.
 data AbsList a = Nil
                | ListVal [a]
@@ -274,6 +293,9 @@ instance AbsEq AbsInt where
 instance AbsEq AbsBool where
     (===) x y = equal (EqableAbsBool x, EqableAbsBool y)
 
+instance AbsEq AbsChar where
+    (===) x y = equal (EqableAbsChar x, EqableAbsChar y)
+
 instance AbsEq Int where
     (===) x y = return $ x==y
 
@@ -282,12 +304,14 @@ instance AbsEq AbsString where
 
 data AbsEqable = EqableAbsInt AbsInt 
                | EqableAbsBool AbsBool
+               | EqableAbsChar AbsChar
                | EqableAbsString AbsString
     deriving (Show, Read)
 
 evalAbsEqable :: Store -> (AbsEqable,AbsEqable) -> Bool
 evalAbsEqable store (EqableAbsInt x, EqableAbsInt y) = (eval store x) == (eval store y)
 evalAbsEqable store (EqableAbsBool x, EqableAbsBool y) = (eval store x) == (eval store y)
+evalAbsEqable store (EqableAbsChar x, EqableAbsChar y) = (eval store x) == (eval store y)
 evalAbsEqable store (EqableAbsString x, EqableAbsString y) = (eval store x) == (eval store y)
 evalAbsEqable store (_,_) = error "Mismatched Eqable constructors"
 
