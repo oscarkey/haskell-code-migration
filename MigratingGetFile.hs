@@ -29,7 +29,7 @@ listFilesComp port fileHost = do
     forEach (\fileName -> printStr fileName) files
 
 
-getFileComp :: Port -> AbsHostName -> AbsList AbsFileName -> MigrationComp ()
+getFilesComp :: Port -> AbsHostName -> AbsList AbsFileName -> MigrationComp ()
 getFileComp port fileHost fileNames = do
     printStr "Please enter your username:"
     username <- readStr
@@ -61,5 +61,5 @@ main = do
         [port, fileHost] -> runMigrationComp port $ listFilesComp port (toAbs fileHost)
         (port : fileHost : files) -> 
             let absFiles = toAbs $ map (\file -> toAbs file) files
-            in runMigrationComp port $ getFileComp port (toAbs fileHost) absFiles
-        _ -> error "Please provide arguments [port] [server address] ([file name])"
+            in runMigrationComp port $ getFilesComp port (toAbs fileHost) absFiles
+        _ -> error "Please provide arguments [port] [server address] ([file names])"
