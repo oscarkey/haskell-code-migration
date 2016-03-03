@@ -11,9 +11,9 @@ import Network.Simple.TCP (HostName)
 
 type AbsFileName = AbsString
 
-authServer = "127.0.0.1" :: AbsString
-authPort = "8002" :: AbsPort
-filePort = "8003" :: AbsPort
+authServer = "127.0.0.1"
+authPort = "8002"
+filePort = "8003"
 
 listFilesComp :: Port -> AbsHostName -> MigrationComp ()
 listFilesComp port fileHost = do
@@ -52,7 +52,7 @@ readFiles fileNames =
                             text <- readFl f
                             rest <- limited (n-1) (tl files)
                             return $ acons text rest
-    in limited (10::Int) fileNames
+    in limited 10 fileNames
 
 main :: IO ()
 main = do
