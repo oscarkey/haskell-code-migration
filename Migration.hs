@@ -294,6 +294,7 @@ data CompTree a = Result a
     | PrintIntEffect AbsInt (CompTree a)
     | ReadStrEffect (StoreKey [Char]) (CompTree a)
     | ReadIntEffect (StoreKey Int) (CompTree a)
+    | ReadFlEffect AbsString (StoreKey [Char]) (CompTree a)
     | EqualEffect (AbsEqable, AbsEqable) (CompTree a) (CompTree a)
     | IterateEffect (CompTree (), AbsList AbsString, StoreKey String) (CompTree a)
     | HdEffect (AbsList AbsString) (StoreKey String) (CompTree a) (CompTree a)
@@ -309,19 +310,20 @@ type UnitCompTree = CompTree ()
 [operation|PrintInt     :: AbsInt -> ()|]
 [operation|ReadStr      :: AbsString|]
 [operation|ReadInt      :: AbsInt|]
+[operation|ReadFl       :: AbsString -> AbsString|]
 [operation|Equal        :: (AbsEqable, AbsEqable) -> Bool|]
 [operation|Iterate      :: (UnitCompTree, AbsList AbsString, StoreKey String) -> ()|]
 [operation|Hd           :: AbsList AbsString -> Maybe AbsString|]
 [operation|FreshVar     :: GenericStoreKey|]
 
 type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, 
-                                    Equal, Iterate, Hd, FreshVar}|])
+                                    ReadFl, Equal, Iterate, Hd, FreshVar}|])
                         => Comp h a
 
 [handler|
     ReifyComp a :: GenericStoreKey -> CompTree a
-        handles {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, Equal, Iterate, Hd,
-                 FreshVar} where
+        handles {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, ReadFl, 
+                 Equal, Iterate, Hd, FreshVar} where
             Return            x i -> Result x
             Migrate    (h, p) k i -> MigrateEffect (h, p) (k () i)
             PrintStr      str k i -> PrintStrEffect str (k () i)
@@ -333,6 +335,9 @@ type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintStrList, PrintInt, R
             ReadInt           k i -> 
                 let key = StoreKey i
                 in ReadIntEffect key (k (IntVar key) (i+1))
+            ReadFl       file k i ->
+                let key = StoreKey i
+                in ReadFlEffect file key (k (ListVar key) (i+1))
             Equal       (x,y) k i -> EqualEffect (x,y) (k True i) (k False i)
             Iterate  (f,xs,x) k i -> IterateEffect (f,xs,x) (k () i)
             Hd             xs k i ->
@@ -388,6 +393,11 @@ runCompTree port (store, effect) = case effect of
     ReadIntEffect k comp -> do
         line <- getLine
         let store' = save store k (read line)
+        runCompTree port (store', comp)
+    ReadFlEffect file k comp -> do
+        let file' = eval store file
+        text <- readFile file'
+        let store' = save store k text
         runCompTree port (store', comp)
     EqualEffect (x,y) compt compf -> 
         if evalAbsEqable store (x,y) then runCompTree port (store, compt) 
