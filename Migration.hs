@@ -294,7 +294,7 @@ evalAbsEqable store (_,_) = error "Mismatched Eqable constructors"
 
 -- Computation tree.
 data CompTree a = Result a
-    | MigrateEffect (HostName, Port) (CompTree a)
+    | MigrateEffect (AbsHostName, AbsPort) (CompTree a)
     | PrintStrEffect AbsString (CompTree a)
     | PrintStrListEffect (AbsList AbsString) (CompTree a)
     | PrintIntEffect AbsInt (CompTree a)
@@ -310,7 +310,7 @@ type UnitCompTree = CompTree ()
 
 
 -- Handlers and reification.
-[operation|Migrate      :: (HostName, Port) -> ()|]
+[operation|Migrate      :: (AbsHostName, AbsPort) -> ()|]
 [operation|PrintStr     :: AbsString -> ()|]
 [operation|PrintStrList :: AbsList AbsString -> ()|]
 [operation|PrintInt     :: AbsInt -> ()|]
@@ -355,7 +355,9 @@ type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintStrList, PrintInt, R
 
 
 -- Networking.
+type AbsHostName = AbsString
 type Port = String
+type AbsPort = AbsString
 
 listenForComp :: Port -> IO ()
 listenForComp port = listen (Host "127.0.0.1") port $ \(socket, socketAddress) -> do
@@ -379,7 +381,9 @@ runCompTree :: (Show a, Read a) => Port -> (Store, CompTree a) -> IO (Maybe (Sto
 runCompTree port (store, effect) = case effect of
     Result x -> return $ Just (store, x)
     MigrateEffect (dhost, dport) comp -> do
-        sendComp (dhost, dport) (store, comp)
+        let dhost' = eval store dhost
+            dport' = eval store dport
+        sendComp (dhost', dport') (store, comp)
         listenForComp port
         return Nothing
     PrintStrEffect str comp -> do
