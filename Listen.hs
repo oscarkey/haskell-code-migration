@@ -1,3 +1,10 @@
+{-# LANGUAGE
+    FlexibleContexts,
+    ConstraintKinds,
+    OverloadedStrings,
+    OverloadedLists,
+    RankNTypes #-}
+
 import Migration
 import System.Environment (getArgs)
 
