@@ -109,13 +109,16 @@ instance Storeable [AbsString] where
 -- Abstract values.
 class Abstract a b | b -> a where
     eval :: Store -> b -> a
+    toAbs :: a -> b
 
 -- While these types are not abstract, it is helpful to map them to themselves so we can eval them.
 instance Abstract Int Int where
     eval _ x = x
+    toAbs x = x
 
 instance Abstract [a] [a] where
     eval _ x = x
+    toAbs x = x
 
 
 -- Abstract Int.
@@ -146,6 +149,7 @@ instance Abstract Int AbsInt where
     eval store (OpMinus x y) = (eval store x) - (eval store y)
     eval store (OpMult  x y) = (eval store x) * (eval store y)
     eval store (OpSig     x) = signum $ eval store x
+    toAbs x = IntVal x
 
 
 -- Abstract Bool.
@@ -171,6 +175,7 @@ instance Abstract Bool AbsBool where
     eval store (And   x y) = (eval store x) && (eval store y)
     eval store (Or    x y) = (eval store x) || (eval store y)
     eval store (Not     x) = not (eval store x)
+    toAbs x = BoolVal x
 
 
 -- Abstract lists.
@@ -207,6 +212,7 @@ instance (Storeable [a]) => Abstract [a] (AbsList a) where
     eval store (Tail     xs) = let xs' = eval store xs
                                   in case xs' of [] -> []
                                                  (y:ys) -> ys
+    toAbs x = ListVal x
 
 acons :: a -> AbsList a -> AbsList a
 acons x xs = Cons x xs
