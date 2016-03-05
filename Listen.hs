@@ -11,5 +11,7 @@ import System.Environment (getArgs)
 main :: IO ()
 main = do 
 	args <- getArgs
-	let port = head args
-	listenForComp port
+    if length args == 1 then do
+	    let port = head args
+	    listenForComp port
+    else putStrLn "Usage: Listen [port]"
