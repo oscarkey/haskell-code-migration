@@ -36,8 +36,8 @@ main :: IO ()
 main = do
     args <- getArgs
     case args of
-        [port, fileHost] -> makeRequest port fileHost 
-                                (ListRequest {clientHost = "127.0.0.1", clientPort = "8001"}) 
-        (port : fileHost : files) -> makeRequest port fileHost 
-                (FileRequest {clientHost = "127.0.0.1", clientPort = "8001", fileNames = files})
+        [port, fileHost] -> makeRequest port fileHost $
+                                ListRequest {clientHost = "127.0.0.1", clientPort = "8001"} 
+        (port : fileHost : files) -> makeRequest port fileHost $
+                FileRequest {clientHost = "127.0.0.1", clientPort = "8001", fileNames = files}
         _ -> error "Please provide arguments [port] [server address] ([file names])"
