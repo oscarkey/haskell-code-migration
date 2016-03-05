@@ -20,9 +20,11 @@ receiveRequest (socket, remoteAddress) = do
     -- Find out what kind of request this is.
     (clientHost, clientPort, response) <- case fileRequest of 
         FileRequest {clientHost, clientPort, fileNames} -> do
+            putStrLn $ "Recieved request for files: " ++ (show fileNames)
             files <- mapM (\file -> readFile file) fileNames
             return (clientHost, clientPort, FileResponse files)
         ListRequest {clientHost, clientPort} -> do
+            putStrLn $ "Recieved request to list files."
             files <- getDirectoryContents "."
             return (clientHost, clientPort, ListResponse files)
     -- Send the response to the client.
