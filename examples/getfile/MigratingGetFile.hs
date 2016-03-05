@@ -28,7 +28,7 @@ listFilesComp port fileHost = do
 
 
 getFilesComp :: Port -> AbsHostName -> AbsList AbsFileName -> MigrationComp ()
-getFileComp port fileHost fileNames = do
+getFilesComp port fileHost fileNames = do
     (username, password) <- getUserPass
     migrate (authServer, authPort)
     printStr $ username +++ " is trying to access files on server " +++ fileHost
@@ -37,13 +37,13 @@ getFileComp port fileHost fileNames = do
     migrate ("127.0.0.1", clientPort)
     forEach (\file -> printStr file) files
 
-getUserPass :: MigrationComp (String, String)
+getUserPass :: MigrationComp (AbsString, AbsString)
 getUserPass = do
     printStr "Please enter your username:"
     username <- readStr
     printStr "Please enter your password:"
     password <- readStr
-    return (username, password
+    return (username, password)
 
 readFiles :: AbsList AbsFileName -> MigrationComp (AbsList AbsString)
 readFiles fileNames =
