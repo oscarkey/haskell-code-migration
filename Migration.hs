@@ -19,8 +19,10 @@ import Prelude hiding ((&&), (||), not, iterate)
 import Handlers
 import DesugarHandlers
 import Network.Simple.TCP (connect, serve, HostPreference(Host), HostName)
-import Network.Socket (recv, send)
+import Network.Socket (send, socketToHandle)
+import System.IO 
 import System.Directory (getDirectoryContents)
+import GHC.IO.Handle 
 import qualified Data.Map.Strict as Map
 import Data.List hiding (iterate)
 import Data.String
@@ -393,7 +395,10 @@ listenForComp :: Port -> IO ()
 listenForComp port = do
     putStrLn "Listening for incoming connections..."
     serve (Host "127.0.0.1") port $ \(socket, remoteAddress) -> do
-        str <- recv socket 65536
+        handle <- socketToHandle socket ReadMode
+        hSetBuffering handle LineBuffering
+        str <- hGetLine handle
+        hClose handle
         putStrLn "Received computation, running it"
         let (store, comp) = (read str :: (Store, CompTree ()))
         runCompTree (store, comp)
