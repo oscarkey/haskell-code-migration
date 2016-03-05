@@ -17,10 +17,7 @@ filePort = "8003"
 
 listFilesComp :: Port -> AbsHostName -> MigrationComp ()
 listFilesComp port fileHost = do
-    printStr "Please enter your username:"
-    username <- readStr
-    printStr "Please enter your password:"
-    password <- readStr
+    (username, password) <- getUserPass
     migrate (authServer, authPort)
     printStr $ username +++ " is trying to list the files on " +++ fileHost
     migrate (fileHost, filePort)
@@ -31,16 +28,21 @@ listFilesComp port fileHost = do
 
 getFilesComp :: Port -> AbsHostName -> AbsList AbsFileName -> MigrationComp ()
 getFileComp port fileHost fileNames = do
-    printStr "Please enter your username:"
-    username <- readStr
-    printStr "Please enter your password:"
-    password <- readStr
+    (username, password) <- getUserPass
     migrate (authServer, authPort)
     printStr $ username +++ " is trying to access files on server " +++ fileHost
     migrate (fileHost, filePort)
     files <- readFiles fileNames
     migrate ("127.0.0.1", "8001")
     forEach (\file -> printStr file) files
+
+getUserPass :: MigrationComp (String, String)
+getUserPass = do
+    printStr "Please enter your username:"
+    username <- readStr
+    printStr "Please enter your password:"
+    password <- readStr
+    return (username, password
 
 readFiles :: AbsList AbsFileName -> MigrationComp (AbsList AbsString)
 readFiles fileNames =
