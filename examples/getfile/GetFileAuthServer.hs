@@ -12,6 +12,7 @@ receiveAuthRequest (socket, remoteAddress) = do
     handle <- socketToHandle socket ReadMode
     hSetBuffering handle LineBuffering
     received <- hGetLine handle
+    hClose handle
     let authRequest = read received
     putStrLn $ (username authRequest) ++ " is trying to access server " ++ (fileHost authRequest)
     -- Check the username and password.

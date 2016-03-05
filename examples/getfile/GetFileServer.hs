@@ -15,6 +15,7 @@ receiveRequest (socket, remoteAddress) = do
     handle <- socketToHandle socket ReadMode
     hSetBuffering handle LineBuffering
     received <- hGetLine handle
+    hClose handle
     let fileRequest = read received
     -- Find out what kind of request this is.
     (clientHost, clientPort, response) <- case fileRequest of 

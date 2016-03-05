@@ -26,6 +26,7 @@ makeRequest port fileHost request = do
             handle <- socketToHandle socket ReadMode
             hSetBuffering handle LineBuffering
             received <- hGetLine handle
+            hClose handle
             let response = read received
             case response of FileResponse files -> traverse_ (\file -> putStrLn file) files
                              ListResponse files -> traverse_ (\file -> putStrLn file) files 
