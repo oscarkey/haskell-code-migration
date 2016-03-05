@@ -12,6 +12,7 @@ import Network.Simple.TCP (HostName)
 type AbsFileName = AbsString
 
 authServer = "127.0.0.1"
+clientPort = "8001"
 authPort = "8002"
 filePort = "8003"
 
@@ -22,7 +23,7 @@ listFilesComp port fileHost = do
     printStr $ username +++ " is trying to list the files on " +++ fileHost
     migrate (fileHost, filePort)
     files <- listFls
-    migrate ("127.0.0.1", "8001")
+    migrate ("127.0.0.1", clientPort)
     forEach (\fileName -> printStr fileName) files
 
 
@@ -33,7 +34,7 @@ getFileComp port fileHost fileNames = do
     printStr $ username +++ " is trying to access files on server " +++ fileHost
     migrate (fileHost, filePort)
     files <- readFiles fileNames
-    migrate ("127.0.0.1", "8001")
+    migrate ("127.0.0.1", clientPort)
     forEach (\file -> printStr file) files
 
 getUserPass :: MigrationComp (String, String)
