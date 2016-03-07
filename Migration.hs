@@ -279,6 +279,9 @@ instance AbsShow AbsInt where
 instance AbsShow AbsBool where
     ashow store x = show $ eval store x
 
+instance AbsShow AbsString where
+    ashow store x = eval store x
+
 instance (Storeable [a], Show a) => AbsShow (AbsList a) where
     ashow store x = show $ eval store x
 
