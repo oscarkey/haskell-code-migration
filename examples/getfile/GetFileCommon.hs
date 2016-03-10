@@ -1,6 +1,6 @@
 module GetFileCommon where
 
-import Network.Simple.TCP (HostName)
+import Network.Simple.TCP hiding (send)
 
 type Port = String
 type FileName = String
@@ -23,3 +23,4 @@ data DataRequest = FileRequest {clientHost :: HostName, clientPort :: Port, file
 data DataResponse = FileResponse {files :: [String]}
                   | ListResponse {files :: [FileName]}
                   deriving (Show, Read)
+

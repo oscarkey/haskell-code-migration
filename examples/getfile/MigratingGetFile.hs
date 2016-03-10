@@ -26,7 +26,6 @@ listFilesComp port fileHost = do
     migrate ("127.0.0.1", clientPort)
     forEach (\fileName -> printStr fileName) files
 
-
 getFilesComp :: Port -> AbsHostName -> AbsList AbsFileName -> MigrationComp ()
 getFilesComp port fileHost fileNames = do
     (username, password) <- getUserPass
