@@ -39,9 +39,11 @@ getFilesComp port fileHost fileNames = do
 getUserPass :: MigrationComp (AbsString, AbsString)
 getUserPass = do
     printStr "Please enter your username:"
-    username <- readStr
+    -- username <- readStr
+    let username = "oscar" 
     printStr "Please enter your password:"
-    password <- readStr
+    -- password <- readStr
+    let password = "test"
     return (username, password)
 
 readFiles :: AbsList AbsFileName -> MigrationComp (AbsList AbsString)

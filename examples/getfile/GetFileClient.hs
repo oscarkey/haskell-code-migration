@@ -5,6 +5,7 @@ import GHC.IO.Handle
 import System.IO 
 import Data.Foldable (traverse_)
 import GetFileCommon
+import Data.Time.Clock
 
 recvLine :: Port -> (String -> IO ()) -> IO ()
 recvLine port callback = do
@@ -18,11 +19,14 @@ recvLine port callback = do
 
 makeRequest :: Port -> HostName -> DataRequest -> IO ()
 makeRequest port fileHost request = do
+    startTime <- getCurrentTime
     -- Get the username and password.
     putStrLn "Please enter your username:"
-    username <- getLine
+    -- username <- getLine
+    let username = "oscar"
     putStrLn "Please enter your password:"
-    password <- getLine
+    -- password <- getLine
+    let password = "test"
     -- Build and send the request.
     let authRequest = AuthRequest {username = username,
                                    password = password,
@@ -35,6 +39,8 @@ makeRequest port fileHost request = do
         let response = read line
         case response of FileResponse files -> traverse_ (\file -> putStrLn file) files
                          ListResponse files -> traverse_ (\file -> putStrLn file) files 
+        finishTime <- getCurrentTime
+        writeFile "results.txt" $ show (diffUTCTime finishTime startTime)
     return ()
 
 

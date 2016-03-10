@@ -29,6 +29,7 @@ import Data.String
 import Data.Boolean
 import Data.Foldable (traverse_)
 import GHC.Exts (IsList(Item, fromList, toList))
+import Data.Time.Clock
 
 
 -- Store.
@@ -403,8 +404,12 @@ listenForComp port = do
         str <- hGetLine handle
         hClose handle
         putStrLn "Received computation, running it"
+        startTime <- getCurrentTime
         let (store, comp) = (read str :: (Store, CompTree ()))
         runCompTree (store, comp)
+        finishTime <- getCurrentTime
+        let time = diffUTCTime finishTime startTime
+        appendFile "results.txt" $ (show time) ++ "\n"
         return ()
 
 sendComp :: (Show a, Read a) => (HostName, Port) -> (Store, CompTree a) -> IO Int
@@ -468,7 +473,11 @@ runCompTree (store, effect) = case effect of
 
 runMigrationComp :: Port -> MigrationComp () -> IO ()
 runMigrationComp port comp = do
+    startTime <- getCurrentTime
     let comp' = reifyComp 0 comp
     runCompTree (emptyStore, comp')
+    finishTime <- getCurrentTime
+    let time = diffUTCTime finishTime startTime
+    writeFile "results.txt" $ (show time) ++ "\n"
     listenForComp port
     return ()
