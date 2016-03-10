@@ -6,6 +6,16 @@ import System.IO
 import Data.Foldable (traverse_)
 import GetFileCommon
 
+recvLine :: Port -> (String -> IO ()) -> IO ()
+recvLine port callback = do
+    listen HostAny port $ \(socket, _) -> do
+        accept socket $ \(socket, _) -> do
+            handle <- socketToHandle socket ReadMode
+            hSetBuffering handle LineBuffering
+            recieved <- hGetLine handle
+            hClose handle
+            callback recieved
+
 makeRequest :: Port -> HostName -> DataRequest -> IO ()
 makeRequest port fileHost request = do
     -- Get the username and password.
@@ -21,15 +31,10 @@ makeRequest port fileHost request = do
     connect authHost authPort $ \(socket, remoteAddress) -> do
         send socket $ show authRequest
     -- Wait for the response and print it.
-    listen HostAny port $ \(socket, _) -> do
-        accept socket $ \(socket, _) -> do
-            handle <- socketToHandle socket ReadMode
-            hSetBuffering handle LineBuffering
-            received <- hGetLine handle
-            hClose handle
-            let response = read received
-            case response of FileResponse files -> traverse_ (\file -> putStrLn file) files
-                             ListResponse files -> traverse_ (\file -> putStrLn file) files 
+    recvLine port $ \line -> do
+        let response = read line
+        case response of FileResponse files -> traverse_ (\file -> putStrLn file) files
+                         ListResponse files -> traverse_ (\file -> putStrLn file) files 
     return ()
 
 
