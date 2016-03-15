@@ -118,7 +118,7 @@ instance Storeable [AbsString] where
                      _ -> error "Wrong type in store, expected [AbsString]"
 
 -- Abstract values.
-class Abstract a b | b -> a where
+class Abstract a c | a -> c where
     eval :: Store -> b -> a
     toAbs :: a -> b
 
@@ -153,7 +153,7 @@ instance Num AbsInt where
     abs x = x * (signum x)
     fromInteger x = IntVal (fromInteger x)
 
-instance Abstract Int AbsInt where
+instance Abstract AbsInt Int where
     eval store (IntVal    x) = x
     eval store (IntVar    k) = retrieve store k
     eval store (OpPlus  x y) = (eval store x) + (eval store y)
@@ -180,7 +180,7 @@ instance Boolean AbsBool where
     (||) x y = Or x y
     not x = Not x
 
-instance Abstract Bool AbsBool where
+instance Abstract AbsBool Bool where
     eval store (BoolVal x) = x
     eval store (BoolVar k) = retrieve store k
     eval store (And   x y) = (eval store x) && (eval store y)
@@ -194,7 +194,7 @@ data AbsChar = CharVal Char
              | CharVar (StoreKey Char)
     deriving (Show, Read)
 
-instance Abstract Char AbsChar where
+instance Abstract AbsChar Char where
     eval store (CharVal x) = x
     eval store (CharVar k) = retrieve store k
     toAbs x = CharVal x
