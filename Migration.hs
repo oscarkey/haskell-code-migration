@@ -48,11 +48,11 @@ type Store = Map.Map GenericStoreKey StoreValue
 emptyStore :: Store
 emptyStore = Map.empty
 
-generalSave :: Store -> StoreKey a -> StoreValue -> Store
-generalSave store (StoreKey k) x = Map.insert k x store
+genericSave :: Store -> StoreKey a -> StoreValue -> Store
+genericSave store (StoreKey k) x = Map.insert k x store
 
-generalRetrieve :: Store -> StoreKey a -> StoreValue
-generalRetrieve store (StoreKey k) =
+genericRetrieve :: Store -> StoreKey a -> StoreValue
+genericRetrieve store (StoreKey k) =
     let v = Map.lookup k store in
         case v of Just u  -> u
                   Nothing -> error "No value associated with store location"
@@ -62,58 +62,58 @@ class Storeable a where
     retrieve :: Store -> StoreKey a -> a
 
 instance Storeable Int where
-    save store k x = generalSave store k (StoreIntValue x)
+    save store k x = genericSave store k (StoreIntValue x)
     retrieve store k = 
-        let v = generalRetrieve store k
+        let v = genericRetrieve store k
         in case v of StoreIntValue x -> x
                      _ -> error "Wrong type in store, expected Int"
 
 instance Storeable Bool where
-    save store k x = generalSave store k (StoreBoolValue x)
+    save store k x = genericSave store k (StoreBoolValue x)
     retrieve store k = 
-        let v = generalRetrieve store k
+        let v = genericRetrieve store k
         in case v of StoreBoolValue x -> x
                      _ -> error "Wrong type in store, expected Bool"
 
 instance Storeable Char where
-    save store k x = generalSave store k (StoreCharValue x)
+    save store k x = genericSave store k (StoreCharValue x)
     retrieve store k = 
-        let v = generalRetrieve store k
+        let v = genericRetrieve store k
         in case v of StoreCharValue x -> x
                      _ -> error "Wrong type in store, expected Bool"
 
 instance Storeable [Bool] where
-    save store k x = generalSave store k (StoreBoolListValue x)
+    save store k x = genericSave store k (StoreBoolListValue x)
     retrieve store k = 
-        let v = generalRetrieve store k
+        let v = genericRetrieve store k
         in case v of StoreBoolListValue x -> x
                      _ -> error "Wrong type in store, expected [Bool]"
 
 instance Storeable String where
-    save store k x = generalSave store k (StoreStringValue x)
+    save store k x = genericSave store k (StoreStringValue x)
     retrieve store k = 
-        let v = generalRetrieve store k
+        let v = genericRetrieve store k
         in case v of StoreStringValue x -> x
                      _ -> error "Wrong type in store, expected String"
 
 instance Storeable AbsString where
-    save store k x = generalSave store k (StoreAbsStringValue x)
+    save store k x = genericSave store k (StoreAbsStringValue x)
     retrieve store k =
-        let v = generalRetrieve store k
+        let v = genericRetrieve store k
         in case v of StoreAbsStringValue x -> x
                      _ -> error "Wrong type in store, expected AbsString"
 
 instance Storeable [String] where
-    save store k x = generalSave store k (StoreStringListValue x)
+    save store k x = genericSave store k (StoreStringListValue x)
     retrieve store k =
-        let v = generalRetrieve store k
+        let v = genericRetrieve store k
         in case v of StoreStringListValue x -> x
                      _ -> error "Wrong type in store, expected [String]"
 
 instance Storeable [AbsString] where
-    save store k x = generalSave store k (StoreAbsStringListValue x)
+    save store k x = genericSave store k (StoreAbsStringListValue x)
     retrieve store k =
-        let v = generalRetrieve store k
+        let v = genericRetrieve store k
         in case v of StoreAbsStringListValue x -> x
                      _ -> error "Wrong type in store, expected [AbsString]"
 
