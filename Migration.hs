@@ -257,14 +257,14 @@ forEach :: (AbsString -> MigrationComp ()) -> AbsList AbsString -> MigrationComp
 forEach f xs = do
     fresh <- freshVar
     let k = StoreKey fresh
-    let rf = reifyComp (fresh*10000) (f (ListVar k))
+        rf = reifyComp (fresh*10000) (f (ListVar k))
     iterate (rf, xs, k)
 
 forEvery :: UnitCompTree -> [AbsString] -> Store -> StoreKey String -> IO ()
 forEvery f [] store k = return ()
 forEvery f (x:xs) store k = do
     let str = eval store x
-    let store' = save store k str
+        store' = save store k str
     runCompTree (store', f)
     forEvery f xs store k
 
