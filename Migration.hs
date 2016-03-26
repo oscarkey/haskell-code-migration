@@ -418,10 +418,10 @@ sendComp (hostName, port) (store, comp) = do
 runCompTree :: (Show a, Read a) => (Store, CompTree a) -> IO (Maybe (Store, a))
 runCompTree (store, effect) = case effect of
     Result x -> return $ Just (store, x)
-    MigrateEffect (dhost, dport) comp -> do
-        let dhost' = eval store dhost
-            dport' = eval store dport
-        sendComp (dhost', dport') (store, comp)
+    MigrateEffect (host, port) comp -> do
+        let host' = eval store host
+            port' = eval store port
+        sendComp (host', port') (store, comp)
         return Nothing
     PrintStrEffect str comp -> do
         putStrLn $ ashow store str
