@@ -438,9 +438,8 @@ runCompTree (store, effect) = case effect of
         let store' = save store k line
         runCompTree (store', comp)
     ReadIntEffect k comp -> do
-        line <- getLine
-        let value = read line
-            store' = save store k value
+        value <- readLine
+        let store' = save store k value
         runCompTree (store', comp)
     ReadFlEffect file k comp -> do
         let file' = eval store file
