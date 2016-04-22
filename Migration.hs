@@ -330,6 +330,7 @@ data CompTree a = Result a
     | PrintIntEffect AbsInt (CompTree a)
     | ReadStrEffect (StoreKey [Char]) (CompTree a)
     | ReadIntEffect (StoreKey Int) (CompTree a)
+    | AskEffect AbsString (CompTree a) (CompTree a)
     | ReadFlEffect AbsString (StoreKey [Char]) (CompTree a)
     | ListFlsEffect (StoreKey [AbsString]) (CompTree a)
     | EqualEffect (AbsEqable, AbsEqable) (CompTree a) (CompTree a)
@@ -348,6 +349,7 @@ type UnitCompTree = CompTree ()
 [operation|ReadStr      :: AbsString|]
 [operation|ReadInt      :: AbsInt|]
 [operation|ReadFl       :: AbsString -> AbsString|]
+[operation|Ask          :: AbsString -> Bool|]
 [operation|ListFls      :: AbsList AbsString|]
 [operation|Equal        :: (AbsEqable, AbsEqable) -> Bool|]
 [operation|Iterate      :: (UnitCompTree, AbsList AbsString, StoreKey String) -> ()|]
@@ -355,12 +357,12 @@ type UnitCompTree = CompTree ()
 [operation|FreshVar     :: GenericStoreKey|]
 
 type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, 
-                                    ReadFl, ListFls, Equal, Iterate, Hd, FreshVar}|])
+                                    Ask, ReadFl, ListFls, Equal, Iterate, Hd, FreshVar}|])
                         => Comp h a
 
 [handler|
     ReifyComp a :: GenericStoreKey -> CompTree a
-        handles {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, ReadFl, 
+        handles {Migrate, PrintStr, PrintStrList, PrintInt, ReadStr, ReadInt, Ask, ReadFl, 
                  ListFls, Equal, Iterate, Hd, FreshVar} where
             Return            x i -> Result x
             Migrate    (h, p) k i -> MigrateEffect (h, p) (k () i)
@@ -373,6 +375,7 @@ type MigrationComp a = ([handles|h {Migrate, PrintStr, PrintStrList, PrintInt, R
             ReadInt           k i -> 
                 let key = StoreKey i
                 in ReadIntEffect key (k (IntVar key) (i+1))
+            Ask             q k i -> AskEffect q (k True i) (k False i)
             ReadFl       file k i ->
                 let key = StoreKey i
                 in ReadFlEffect file key (k (ListVar key) (i+1))
