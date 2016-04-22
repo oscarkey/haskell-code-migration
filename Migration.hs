@@ -119,15 +119,11 @@ instance Storeable [AbsString] where
 
 -- Abstract values.
 class Abstract a c | a -> c where
-    eval :: Store -> b -> a
-    toAbs :: a -> b
+    eval :: Store -> a -> c
+    toAbs :: c -> a
 
 -- While these types are not abstract, it is helpful to map them to themselves so we can eval them.
 instance Abstract Int Int where
-    eval _ x = x
-    toAbs x = x
-
-instance Abstract [a] [a] where
     eval _ x = x
     toAbs x = x
 
@@ -223,7 +219,7 @@ instance IsList (AbsList a) where
 instance IsString AbsString where
     fromString s = fromList s
 
-instance (Storeable [a]) => Abstract [a] (AbsList a) where
+instance (Storeable [a]) => Abstract (AbsList a) [a] where
     eval store           Nil = []
     eval store (ListVal  xs) = xs
     eval store (ListVar   k) = retrieve store k
