@@ -245,6 +245,8 @@ adrop :: Int -> AbsList a -> AbsList a
 adrop n xs = Drop n xs
 
 tl :: AbsList a -> AbsList a
+tl (ListVal []) = ListVal []
+tl (ListVal (x:xs)) = ListVal xs
 tl xs = Tail xs
 
 
