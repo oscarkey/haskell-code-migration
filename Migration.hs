@@ -263,7 +263,7 @@ forEvery f [] store k = return ()
 forEvery f (x:xs) store k = do
     let str = eval store x
         store' = save store k str
-    runCompTree (store', f)
+    executeCompTree (store', f)
     forEvery f xs store k
 
 
@@ -405,7 +405,7 @@ listenForComp port = do
         hClose handle
         putStrLn "Received computation, running it"
         let (store, comp) = (read str :: (Store, CompTree ()))
-        runCompTree (store, comp)
+        executeCompTree (store, comp)
         return ()
 
 sendComp :: (Show a, Read a) => (HostName, Port) -> (Store, CompTree a) -> IO Int
@@ -416,8 +416,8 @@ sendComp (hostName, port) (store, comp) = do
 
 
 -- Interpreter.
-runCompTree :: (Show a, Read a) => (Store, CompTree a) -> IO (Maybe (Store, a))
-runCompTree (store, effect) = case effect of
+executeCompTree :: (Show a, Read a) => (Store, CompTree a) -> IO (Maybe (Store, a))
+executeCompTree (store, effect) = case effect of
     Result x -> return $ Just (store, x)
     MigrateEffect (host, port) comp -> do
         let host' = eval store host
@@ -426,50 +426,50 @@ runCompTree (store, effect) = case effect of
         return Nothing
     PrintStrEffect str comp -> do
         putStrLn $ ashow store str
-        runCompTree (store, comp)
+        executeCompTree (store, comp)
     PrintStrListEffect strs comp -> do
         let strs' = eval store strs
         traverse_ (\str -> putStrLn $ ashow store str) strs'
-        runCompTree (store, comp)
+        executeCompTree (store, comp)
     PrintIntEffect x comp -> do
         putStrLn $ ashow store x
-        runCompTree (store, comp)
+        executeCompTree (store, comp)
     ReadStrEffect k comp -> do
         line <- getLine
         let store' = save store k line
-        runCompTree (store', comp)
+        executeCompTree (store', comp)
     ReadIntEffect k comp -> do
         value <- readLn
         let store' = save store k value
-        runCompTree (store', comp)
+        executeCompTree (store', comp)
     ReadFlEffect file k comp -> do
         let file' = eval store file
         text <- readFile file'
         let store' = save store k text
-        runCompTree (store', comp)
+        executeCompTree (store', comp)
     ListFlsEffect k comp -> do
         files <- getDirectoryContents "."
         let absFiles = map (\s -> toAbs s) files
         let store' = save store k absFiles
-        runCompTree (store', comp)
+        executeCompTree (store', comp)
     EqualEffect (x,y) compt compf -> 
-        if evalAbsEqable store (x,y) then runCompTree (store, compt) 
-                                     else runCompTree (store, compf)
+        if evalAbsEqable store (x,y) then executeCompTree (store, compt) 
+                                     else executeCompTree (store, compf)
     IterateEffect (f,xs,k) comp -> do
         let xs' = eval store xs
         forEvery f xs' store k
-        runCompTree (store, comp)
+        executeCompTree (store, comp)
     HdEffect xs k compt compf -> 
         let xs' = eval store xs
-        in case xs' of [] -> runCompTree (store, compf)
+        in case xs' of [] -> executeCompTree (store, compf)
                        (x:xs) -> do
                             let x' = eval store x
                                 store' = save store k x'
-                            runCompTree (store', compt)
+                            executeCompTree (store', compt)
 
 runMigrationComp :: Port -> MigrationComp () -> IO ()
 runMigrationComp port comp = do
     let comp' = reifyComp 0 comp
-    runCompTree (emptyStore, comp')
+    executeCompTree (emptyStore, comp')
     listenForComp port
     return ()
