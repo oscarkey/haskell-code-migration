@@ -1,0 +1,3 @@
+[submodule "effect-handlers"]
+	path = effect-handlers
+	url = https://github.com/slindley/effect-handlers.git
