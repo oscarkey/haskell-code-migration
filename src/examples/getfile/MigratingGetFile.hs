@@ -21,7 +21,7 @@ listFilesComp port fileHost = do
     (username, password) <- getUserPass
     migrate (authServer, authPort)
     printStr $ username +++ " is trying to list the files on " +++ fileHost
-    migrate (fileHost, filePort)
+    aMigrate (username +++ password, fileHost, filePort)
     files <- listFls
     migrate ("127.0.0.1", clientPort)
     forEach (\fileName -> printStr fileName) files
@@ -31,7 +31,7 @@ getFilesComp port fileHost fileNames = do
     (username, password) <- getUserPass
     migrate (authServer, authPort)
     printStr $ username +++ " is trying to access files on server " +++ fileHost
-    migrate (fileHost, filePort)
+    aMigrate (username +++ password, fileHost, filePort)
     files <- readFiles fileNames
     migrate ("127.0.0.1", clientPort)
     forEach (\file -> printStr file) files
