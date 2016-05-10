@@ -15,4 +15,5 @@ cabal.sandbox.config
 *.hp
 .stack-work/
 *.swp
-build.sh
+effect-handlers/
+build/
