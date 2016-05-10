@@ -251,6 +251,11 @@ tl xs = Tail xs
 
 
 -- Abstract iteration
+-- Ideally forEach would be an effect of type
+-- (a -> MigrationComp b) -> AbsList a -> MigrationComp b
+-- However, the effect handlers system does not allow polymorphic effect types, nor can you pass an
+-- effect a function. Hence forEach reifies the function, and passes the computation tree to the 
+-- Iterate effect.
 forEach :: (AbsString -> MigrationComp ()) -> AbsList AbsString -> MigrationComp ()
 forEach f xs = do
     fresh <- freshVar
@@ -258,6 +263,7 @@ forEach f xs = do
         rf = reifyComp (fresh*10000) (f (ListVar k))
     iterate (rf, xs, k)
 
+-- forEvery is a helper function called by the execution function to execute the Iterate effect.
 forEvery :: UnitCompTree -> [AbsString] -> Store -> StoreKey String -> IO ()
 forEvery f [] store k = return ()
 forEvery f (x:xs) store k = do
@@ -350,6 +356,7 @@ type UnitCompTree = CompTree ()
 [operation|Ask          :: AbsString -> Bool|]
 [operation|ListFls      :: AbsList AbsString|]
 [operation|Equal        :: (AbsEqable, AbsEqable) -> Bool|]
+-- See the note next to forEach.
 [operation|Iterate      :: (UnitCompTree, AbsList AbsString, StoreKey String) -> ()|]
 [operation|Hd           :: AbsList AbsString -> Maybe AbsString|]
 [operation|FreshVar     :: GenericStoreKey|]
