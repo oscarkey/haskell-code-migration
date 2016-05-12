@@ -16,7 +16,8 @@ data AuthRequest = AuthRequest {
         dataRequest :: DataRequest
     } deriving (Show, Read)
 
-data DataRequest = FileRequest {clientHost :: HostName, clientPort :: Port, fileNames :: [FilePath]} 
+data DataRequest = FileRequest {clientHost :: HostName, clientPort :: Port, 
+                                fileNames :: [FilePath]} 
                  | ListRequest {clientHost :: HostName, clientPort :: Port}
                  deriving (Show, Read)
 

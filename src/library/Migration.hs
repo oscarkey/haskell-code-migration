@@ -269,7 +269,7 @@ forEvery f [] store k = return ()
 forEvery f (x:xs) store k = do
     let str = eval store x
         store' = save store k str
-    executeCompTree Nothing (store', f)
+    executeCompTree NoAuth (store', f)
     forEvery f xs store k
 
 
@@ -405,7 +405,7 @@ type MigrationComp a = ([handles|h {Migrate, AMigrate, PrintStr, PrintStrList, P
 type AbsHostName = AbsString
 type Port = String
 type AbsPort = AbsString
-type AuthPhrase = Maybe String
+data AuthPhrase = NoAuth | Auth String
 
 listenForComp :: Port -> AuthPhrase -> IO ()
 listenForComp port authPhrase = do
@@ -429,69 +429,69 @@ sendComp (hostName, port) (store, comp) = do
 
 -- Interpreter.
 executeCompTree :: (Show a, Read a) => AuthPhrase -> (Store, CompTree a) -> IO (Maybe (Store, a))
-executeCompTree ap (store, effect) = case effect of
+executeCompTree auth (store, effect) = case effect of
     Result x -> return $ Just (store, x)
     MigrateEffect (host, port) comp -> do
         let host' = eval store host
             port' = eval store port
         sendComp (host', port') (store, comp)
         return Nothing
-    AMigrateEffect (auth, host, port) comp ->
-        case ap of Nothing -> return Nothing
-                   Just phrase -> do
-                            let auth' = eval store auth
+    AMigrateEffect (authTry, host, port) comp ->
+        case auth of NoAuth -> return Nothing
+                     Auth phrase -> do
+                            let authTry' = eval store authTry
                                 host' = eval store host
                                 port' = eval store port
-                            if phrase == auth' then do
+                            if phrase == authTry' then do
                                 sendComp (host', port') (store, comp)
                                 return Nothing
                             else return Nothing
     PrintStrEffect str comp -> do
         putStrLn $ ashow store str
-        executeCompTree ap (store, comp)
+        executeCompTree auth (store, comp)
     PrintStrListEffect strs comp -> do
         let strs' = eval store strs
         traverse_ (\str -> putStrLn $ ashow store str) strs'
-        executeCompTree ap (store, comp)
+        executeCompTree auth (store, comp)
     PrintIntEffect x comp -> do
         putStrLn $ ashow store x
-        executeCompTree ap (store, comp)
+        executeCompTree auth (store, comp)
     ReadStrEffect k comp -> do
         line <- getLine
         let store' = save store k line
-        executeCompTree ap (store', comp)
+        executeCompTree auth (store', comp)
     ReadIntEffect k comp -> do
         value <- readLn
         let store' = save store k value
-        executeCompTree ap (store', comp)
+        executeCompTree auth (store', comp)
     ReadFlEffect file k comp -> do
         let file' = eval store file
         text <- readFile file'
         let store' = save store k text
-        executeCompTree ap (store', comp)
+        executeCompTree auth (store', comp)
     ListFlsEffect k comp -> do
         files <- getDirectoryContents "."
         let absFiles = map (\s -> toAbs s) files
         let store' = save store k absFiles
-        executeCompTree ap (store', comp)
+        executeCompTree auth (store', comp)
     EqualEffect (x,y) compt compf -> 
-        if evalAbsEqable store (x,y) then executeCompTree ap (store, compt) 
-                                     else executeCompTree ap (store, compf)
+        if evalAbsEqable store (x,y) then executeCompTree auth (store, compt) 
+                                     else executeCompTree auth (store, compf)
     IterateEffect (f,xs,k) comp -> do
         let xs' = eval store xs
         forEvery f xs' store k
-        executeCompTree ap (store, comp)
+        executeCompTree auth (store, comp)
     HdEffect xs k compt compf -> 
         let xs' = eval store xs
-        in case xs' of [] -> executeCompTree ap (store, compf)
+        in case xs' of [] -> executeCompTree auth (store, compf)
                        (x:xs) -> do
                             let x' = eval store x
                                 store' = save store k x'
-                            executeCompTree ap (store', compt)
+                            executeCompTree auth (store', compt)
 
 runMigrationComp :: Port -> MigrationComp () -> IO ()
 runMigrationComp port comp = do
     let comp' = reifyComp 0 comp
-    executeCompTree Nothing (emptyStore, comp')
-    listenForComp port Nothing
+    executeCompTree NoAuth (emptyStore, comp')
+    listenForComp port NoAuth
     return ()
