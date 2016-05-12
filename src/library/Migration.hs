@@ -422,7 +422,7 @@ sendComp (hostName, port) (store, comp) = do
         send socket $ show (store, comp)
 
 
--- Interpreter.
+-- Execution.
 executeCompTree :: (Show a, Read a) => (Store, CompTree a) -> IO (Maybe (Store, a))
 executeCompTree (store, effect) = case effect of
     Result x -> return $ Just (store, x)
