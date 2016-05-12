@@ -25,6 +25,7 @@ receiveAuthRequest auth (socket, remoteAddress) = do
 
 checkAuthed :: String -> AuthRequest -> Bool
 checkAuthed auth request = 
+    -- In the future, support actual usernames and passwords. For now, just concatenate.
     let authTry = (username request) ++ (password request)
     in auth == authTry
 

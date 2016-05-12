@@ -407,6 +407,7 @@ type Port = String
 type AbsPort = AbsString
 data AuthPhrase = NoAuth | Auth String
 
+-- If authPhrase is provided, normal migration will fail, only aMigrate will work.
 listenForComp :: Port -> AuthPhrase -> IO ()
 listenForComp port authPhrase = do
     putStrLn "Listening for incoming connections..."
@@ -431,12 +432,16 @@ sendComp (hostName, port) (store, comp) = do
 executeCompTree :: (Show a, Read a) => AuthPhrase -> (Store, CompTree a) -> IO (Maybe (Store, a))
 executeCompTree auth (store, effect) = case effect of
     Result x -> return $ Just (store, x)
-    MigrateEffect (host, port) comp -> do
-        let host' = eval store host
-            port' = eval store port
-        sendComp (host', port') (store, comp)
-        return Nothing
+    MigrateEffect (host, port) comp ->
+        -- If authentication has been provided, then normal migration is not allowed.
+        case auth of Auth _ -> return Nothing
+                     NoAuth -> do
+                        let host' = eval store host
+                            port' = eval store port
+                        sendComp (host', port') (store, comp)
+                        return Nothing
     AMigrateEffect (authTry, host, port) comp ->
+        -- Don't allow migration if the two auth phrases don't match.
         case auth of NoAuth -> return Nothing
                      Auth phrase -> do
                             let authTry' = eval store authTry

@@ -21,6 +21,7 @@ listFilesComp port fileHost = do
     (username, password) <- getUserPass
     migrate (authServer, authPort)
     printStr $ username +++ " is trying to list the files on " +++ fileHost
+    -- In the future, support actual usernames and passwords. For now, just concatenate.
     aMigrate (username +++ password, fileHost, filePort)
     files <- listFls
     migrate ("127.0.0.1", clientPort)
@@ -31,6 +32,7 @@ getFilesComp port fileHost fileNames = do
     (username, password) <- getUserPass
     migrate (authServer, authPort)
     printStr $ username +++ " is trying to access files on server " +++ fileHost
+    -- In the future, support actual usernames and passwords. For now, just concatenate.
     aMigrate (username +++ password, fileHost, filePort)
     files <- readFiles fileNames
     migrate ("127.0.0.1", clientPort)
